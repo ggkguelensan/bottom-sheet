@@ -1,0 +1,20 @@
+{
+  "name": "@adaptive-bottom-sheet/dom",
+  "version": "0.1.0",
+  "description": "DOM, gestures, viewport, focus, and animation binding for adaptive bottom sheets.",
+  "type": "module",
+  "sideEffects": false,
+  "files": ["dist"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@adaptive-bottom-sheet/core": "0.1.0"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  }
+}

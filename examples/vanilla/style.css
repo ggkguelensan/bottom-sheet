@@ -1,0 +1,145 @@
+:root {
+  color: #20242b;
+  background: #e9edf2;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+}
+
+button {
+  min-height: 44px;
+  border: 1px solid #d8dbe1;
+  border-radius: 14px;
+  padding: 0 18px;
+  color: inherit;
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 3px solid #315deb55;
+  outline-offset: 2px;
+}
+
+.app {
+  width: min(680px, 100% - 40px);
+  margin: 18vh auto 0;
+}
+
+h1 {
+  max-width: 620px;
+  margin: 10px 0;
+  font-size: clamp(36px, 8vw, 68px);
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+
+p {
+  max-width: 580px;
+  color: #6f747e;
+  line-height: 1.55;
+}
+
+.eyebrow {
+  color: #315deb;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.primary {
+  color: #fff;
+  background: #315deb;
+  border-color: #315deb;
+}
+
+.sheet-root {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: #171b2366;
+}
+
+.sheet-main {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 28px 28px 0 0;
+  background: #fffdf9;
+  box-shadow: 0 -24px 70px #191d2522;
+  will-change: height, transform;
+}
+
+.sheet-handle {
+  display: grid;
+  width: 100%;
+  height: 36px;
+  min-height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  cursor: grab;
+}
+
+.sheet-handle span {
+  width: 64px;
+  height: 5px;
+  border-radius: 999px;
+  background: #c5c7cc;
+}
+
+.sheet-main[data-dragging="true"] .sheet-handle span {
+  width: 76px;
+  background: #315deb;
+}
+
+.sheet-content {
+  max-height: calc(var(--bottom-sheet-height) - 36px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 22px max(24px, env(safe-area-inset-bottom));
+}
+
+.sheet-content h2 {
+  margin: 8px 0 0;
+  font-size: 26px;
+  letter-spacing: -0.035em;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}

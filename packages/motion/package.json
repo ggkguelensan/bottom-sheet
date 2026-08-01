@@ -1,0 +1,21 @@
+{
+  "name": "@adaptive-bottom-sheet/motion",
+  "version": "0.1.0",
+  "description": "motion/mini animation driver for adaptive bottom sheets.",
+  "type": "module",
+  "sideEffects": false,
+  "files": ["dist"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@adaptive-bottom-sheet/dom": "0.1.0",
+    "motion": "^12.43.0"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  }
+}

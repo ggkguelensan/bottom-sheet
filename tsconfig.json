@@ -1,0 +1,9 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/dom" },
+    { "path": "./packages/motion" },
+    { "path": "./packages/effector" }
+  ]
+}

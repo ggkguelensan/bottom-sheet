@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Adaptive Bottom Sheet — Vanilla + Effector</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main id="app" class="app">
+      <span class="eyebrow">No React</span>
+      <h1>Vanilla DOM + Motion mini + Effector</h1>
+      <p>Effector owns open and snapPoint. DOM interaction goes through the controller.</p>
+      <button id="open-sheet" class="primary">Open sheet</button>
+    </main>
+
+    <div id="sheet-root" class="sheet-root" hidden>
+      <button id="sheet-backdrop" class="backdrop" aria-label="Close sheet"></button>
+      <section id="sheet-main" class="sheet-main" aria-labelledby="sheet-title">
+        <button id="sheet-handle" class="sheet-handle" type="button">
+          <span></span>
+        </button>
+        <div id="sheet-content" class="sheet-content">
+          <span class="eyebrow">Controlled mode</span>
+          <h2 id="sheet-title">Framework-agnostic bottom sheet</h2>
+          <p>Drag only this sheet's handle. Escape, backdrop click, focus trapping, viewport updates, and scroll locking are handled by the DOM package.</p>
+          <div class="actions">
+            <button id="close-sheet">Close</button>
+            <button id="toggle-snap" class="primary">Expand</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

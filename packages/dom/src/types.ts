@@ -1,101 +1,185 @@
 import type {
-  ShellSheetController,
   ResolvedShellSheetSnapPoint,
+  ShellSheetController,
 } from "@shell-sheet/core";
 
-export type ShellSheetEasing =
-  | "linear"
-  | "easeIn"
-  | "easeOut"
-  | "easeInOut"
-  | readonly [number, number, number, number];
+export type ShellSheetPart =
+  | "portal"
+  | "backdrop"
+  | "viewport"
+  | "popup"
+  | "content"
+  | "header"
+  | "body"
+  | "footer"
+  | "handle"
+  | "inert-target";
 
-export type ShellSheetKeyframes = Record<
-  string,
-  string | number | readonly (string | number)[]
->;
+export type ShellRegionName = "header" | "body" | "footer";
+export type ShellRegionLayerName = "settled" | "outgoing" | "incoming";
 
-export interface ShellSheetAnimationOptions {
-  /** Duration in milliseconds. */
-  duration: number;
-  easing: ShellSheetEasing;
-}
+export type ShellRegionLayer<TKey extends string = string> = Readonly<{
+  key: TKey;
+  layer: ShellRegionLayerName;
+}>;
 
-export interface ShellSheetAnimationControls {
-  finished: Promise<void>;
+export type DragAreaOptions = Readonly<{
+  id?: string;
+}>;
+
+export type ShellSheetInsets = Readonly<{
+  top: number;
+  bottom: number;
+}>;
+
+export type ShellSheetElements = Readonly<{
+  portal: HTMLElement | null;
+  backdrop: HTMLElement | null;
+  viewport: HTMLElement | null;
+  popup: HTMLElement | null;
+  content: HTMLElement | null;
+  header: HTMLElement | null;
+  body: HTMLElement | null;
+  footer: HTMLElement | null;
+  handle: HTMLElement | null;
+  inertTarget: HTMLElement | null;
+}>;
+
+export type ShellSheetViewport = Readonly<{
+  offsetLeft: number;
+  offsetTop: number;
+  width: number;
+  height: number;
+  scale: number;
+}>;
+
+export type ShellAnimationResult =
+  | Readonly<{ status: "finished" }>
+  | Readonly<{ status: "cancelled" }>;
+
+export type ShellAnimationControls = Readonly<{
+  finished: Promise<ShellAnimationResult>;
   stop(): void;
-}
+}>;
 
-export interface ShellSheetAnimationDriver {
+export type ShellAnimationOptions = Readonly<{
+  durationMs: number;
+  easing: string;
+}>;
+
+export type ShellAnimationDriver = Readonly<{
   animate(
     element: HTMLElement,
-    keyframes: ShellSheetKeyframes,
-    options: ShellSheetAnimationOptions,
-  ): ShellSheetAnimationControls;
-}
+    keyframes: Keyframe[] | PropertyIndexedKeyframes,
+    options: ShellAnimationOptions,
+  ): ShellAnimationControls;
+}>;
 
-export interface ShellSheetElements {
-  /** Overlay/portal root. It is hidden after the closing animation. */
-  root: HTMLElement;
-  /** The bottom-anchored sheet surface. */
-  main: HTMLElement;
-  /** Drag and toggle affordance. */
-  handle?: HTMLElement;
-  /** Fixed row at the top of the sheet. Its height is part of content sizing. */
-  header?: HTMLElement;
-  /** Element whose scrollHeight represents content height. */
-  content?: HTMLElement;
-  /** Fixed row at the bottom of the sheet. Its height is part of content sizing. */
-  footer?: HTMLElement;
-  /** Additional elements that initiate drag without gaining handle click semantics. */
-  dragAreas?: readonly HTMLElement[];
-  backdrop?: HTMLElement;
-  /** Application region made inert while the sheet is open. */
-  inertTarget?: HTMLElement;
-}
+export type ShellSheetResizeObserver = Readonly<{
+  observe(element: Element): void;
+  unobserve(element: Element): void;
+  disconnect(): void;
+}>;
 
-export interface ShellSheetDomOptions {
-  animation?: ShellSheetAnimationDriver;
-  /**
-   * Modal sheets lock and inert the background. Non-modal sheets leave the
-   * surrounding application interactive and do not steal focus by default.
-   */
-  modality?: "modal" | "non-modal";
-  /** Disable every handle gesture and handle click transition. */
-  draggable?: boolean;
-  openDuration?: number;
-  closeDuration?: number;
-  snapDuration?: number;
-  easing?: ShellSheetEasing;
+export type ShellSheetDomEnvironment = Readonly<{
+  requestAnimationFrame(callback: FrameRequestCallback): number;
+  cancelAnimationFrame(handle: number): void;
+  getComputedStyle(element: Element): CSSStyleDeclaration;
+  createResizeObserver(
+    callback: ResizeObserverCallback,
+  ): ShellSheetResizeObserver;
+  getViewport(portal: HTMLElement): ShellSheetViewport;
+  observeViewport(portal: HTMLElement, callback: () => void): () => void;
+  prefersReducedMotion(): boolean;
+  getDocumentVisibility(document: Document): DocumentVisibilityState;
+  observeDocumentVisibility(
+    document: Document,
+    callback: () => void,
+  ): () => void;
+}>;
 
-  topInset?: number | (() => number);
-  bottomInset?: number | (() => number);
-  minHeight?: number;
-  maxHeight?: number | (() => number);
+export type ShellScrollLockDriver = Readonly<{
+  acquire(document: Document): () => void;
+}>;
 
-  closeOnBackdrop?: boolean;
+export type ShellBackgroundIsolationDriver = Readonly<{
+  acquire(target: HTMLElement): () => void;
+}>;
+
+export type ShellSheetGestureOptions = Readonly<{
+  activationDistance?: number;
+  projectionTime?: number;
+  closeVelocityThreshold?: number;
+  closeDistanceThreshold?: number;
+  rubberBandConstant?: number;
+}>;
+
+export type ShellSheetDomOptions = Readonly<{
+  animation?: ShellAnimationDriver;
+  environment?: ShellSheetDomEnvironment;
+  gesture?: ShellSheetGestureOptions;
+  scrollLock?: ShellScrollLockDriver;
+  backgroundIsolation?: ShellBackgroundIsolationDriver;
   closeOnEscape?: boolean;
-  dismissOnDragDown?: boolean;
-  dismissDistanceRatio?: number;
-  velocityThreshold?: number;
-  rubberBand?: number;
+  closeOnBackdrop?: boolean;
+  initialFocus?: (popup: HTMLElement) => HTMLElement | null;
+}>;
 
-  lockScroll?: boolean;
-  trapFocus?: boolean;
-  restoreFocus?: boolean;
-  reducedMotion?: boolean | "media";
-}
-
-export interface ShellSheetDomBinding {
-  readonly controller: ShellSheetController;
-  readonly elements: ShellSheetElements;
-  /**
-   * Replaces runtime behaviour without tearing down the DOM binding. This is
-   * the path framework adapters should use for presentation or modality
-   * changes so an in-flight animation and gesture keep their lifecycle.
-   */
-  updateOptions(options: ShellSheetDomOptions): void;
+export type ShellSheetDomBinding<
+  TSnap extends string = string,
+  TRegionKey extends string = string,
+> = Readonly<{
+  registerPart(part: ShellSheetPart, element: HTMLElement): () => void;
+  registerRegionLayer(
+    region: ShellRegionName,
+    layer: ShellRegionLayer<TRegionKey>,
+    element: HTMLElement,
+  ): () => void;
+  registerDragArea(
+    element: HTMLElement,
+    options?: DragAreaOptions,
+  ): () => void;
+  setInsets(insets: ShellSheetInsets): void;
   refresh(): void;
-  getResolvedSnapPoints(): readonly ResolvedShellSheetSnapPoint[];
+  getElements(): ShellSheetElements;
   destroy(): void;
-}
+}>;
+
+export type ShellSheetRegistrySnapshot<TRegionKey extends string = string> =
+  Readonly<{
+    elements: ShellSheetElements;
+    regionLayers: ReadonlyMap<
+      ShellRegionName,
+      ReadonlyMap<ShellRegionLayerName, Readonly<{
+        key: TRegionKey;
+        element: HTMLElement;
+        token: number;
+      }>>
+    >;
+    dragAreas: readonly Readonly<{
+      element: HTMLElement;
+      id: string | undefined;
+      token: number;
+    }>[];
+  }>;
+
+export type ShellSheetMeasuredGeometry<TSnap extends string = string> =
+  Readonly<{
+    viewport: ShellSheetViewport;
+    resolvedSnapPoints: readonly ResolvedShellSheetSnapPoint<TSnap>[];
+    targetHeight: number;
+    currentRect: DOMRectReadOnly;
+    headerHeight: number;
+    bodyNaturalHeight: number;
+    footerHeight: number;
+  }>;
+
+export type ShellSheetDomInternals<
+  TSnap extends string = string,
+  TRegionKey extends string = string,
+> = Readonly<{
+  controller: ShellSheetController<TSnap, TRegionKey>;
+  getRegistry(): ShellSheetRegistrySnapshot<TRegionKey>;
+  getResolvedSnapPoints(): readonly ResolvedShellSheetSnapPoint<TSnap>[];
+  schedule(reason: string): void;
+}>;

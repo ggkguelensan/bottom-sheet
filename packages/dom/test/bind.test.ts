@@ -1,324 +1,594 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createShellSheetController } from "@shell-sheet/core";
-import { bindShellSheetToDom } from "../src/index.js";
-import type { ShellSheetAnimationDriver } from "../src/types.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  createShellSheetController,
+  type ShellSheetEvent,
+  type ShellSheetOpenTarget,
+  type ShellSheetTarget,
+} from "@shell-sheet/core";
+import {
+  bindShellSheetToDom,
+  type ShellAnimationDriver,
+  type ShellSheetDomEnvironment,
+  type ShellSheetResizeObserver,
+} from "../src/index.js";
 
-class ResizeObserverStub {
-  observe(): void {}
-  disconnect(): void {}
-  unobserve(): void {}
+type Snap = "compact" | "expanded";
+type Region = "header" | "summary" | "details" | "actions";
+
+const closed = (targetId = "closed:1"): ShellSheetTarget<Snap, Region> => ({
+  targetId,
+  open: false,
+  transition: { cause: "close", direction: "none", motion: "auto" },
+});
+
+const opened = (
+  targetId: string,
+  body: "summary" | "details" = "summary",
+  snapPoint: Snap = "compact",
+  presentation: "sheet" | "dialog" = "sheet",
+): ShellSheetOpenTarget<Snap, Region> => ({
+  targetId,
+  open: true,
+  snapPoints: [
+    { id: "compact", size: { type: "content", maxRatio: 0.7 } },
+    { id: "expanded", size: { type: "ratio", value: 1 } },
+  ],
+  snapPoint,
+  presentation,
+  modality: "modal",
+  draggable: true,
+  contentResizeBehavior: "animate",
+  regions: {
+    header: { key: "header", transition: "preserve" },
+    body: { key: body, transition: "crossfade" },
+    footer: { key: "actions", transition: "preserve" },
+  },
+  transition: { cause: "navigate", direction: "forward", motion: "auto" },
+});
+
+class FakeFrames {
+  private nextId = 0;
+  private readonly frames = new Map<number, FrameRequestCallback>();
+
+  request = (callback: FrameRequestCallback): number => {
+    const id = ++this.nextId;
+    this.frames.set(id, callback);
+    return id;
+  };
+
+  cancel = (id: number): void => {
+    this.frames.delete(id);
+  };
+
+  flush(): void {
+    const frames = [...this.frames.entries()];
+    this.frames.clear();
+    for (const [id, callback] of frames) callback(id * 16.67);
+  }
+
+  pending(): number {
+    return this.frames.size;
+  }
 }
 
-const settlePromises = async (): Promise<void> => {
-  for (let index = 0; index < 10; index += 1) {
+class FakeResizeObserver implements ShellSheetResizeObserver {
+  readonly elements = new Set<Element>();
+  observe = (element: Element): void => {
+    this.elements.add(element);
+  };
+  unobserve = (element: Element): void => {
+    this.elements.delete(element);
+  };
+  disconnect = (): void => {
+    this.elements.clear();
+  };
+}
+
+const createHarness = () => {
+  const frames = new FakeFrames();
+  const observer = new FakeResizeObserver();
+  const environment: ShellSheetDomEnvironment = {
+    requestAnimationFrame: frames.request,
+    cancelAnimationFrame: frames.cancel,
+    getComputedStyle: (element) => window.getComputedStyle(element),
+    createResizeObserver: () => observer,
+    getViewport: () => ({
+      offsetLeft: 0,
+      offsetTop: 0,
+      width: 390,
+      height: 800,
+      scale: 1,
+    }),
+    observeViewport: () => () => undefined,
+    prefersReducedMotion: () => false,
+    getDocumentVisibility: () => "visible",
+    observeDocumentVisibility: () => () => undefined,
+  };
+  const calls: Array<{
+    element: HTMLElement;
+    keyframes: Keyframe[] | PropertyIndexedKeyframes;
+    duration: number;
+  }> = [];
+  const animation: ShellAnimationDriver = {
+    animate(element, keyframes, options) {
+      calls.push({ element, keyframes, duration: options.durationMs });
+      return {
+        finished: Promise.resolve({ status: "finished" }),
+        stop: vi.fn(),
+      };
+    },
+  };
+  return { frames, observer, environment, animation, calls };
+};
+
+const rect = (height: number, width = 390): DOMRect =>
+  ({
+    x: 0,
+    y: 800 - height,
+    width,
+    height,
+    top: 800 - height,
+    right: width,
+    bottom: 800,
+    left: 0,
+    toJSON: () => ({}),
+  }) as DOMRect;
+
+const element = (tag = "div", height = 0): HTMLElement => {
+  const node = document.createElement(tag);
+  node.getBoundingClientRect = () => rect(height);
+  return node;
+};
+
+const registerAnatomy = (
+  binding: ReturnType<typeof bindShellSheetToDom<Snap, Region>>,
+  bodyKey: "summary" | "details" = "summary",
+) => {
+  const portal = element("div");
+  portal.hidden = true;
+  const backdrop = element("div");
+  backdrop.style.opacity = "0.4";
+  const viewport = element("div", 800);
+  const popup = element("div", 0);
+  const content = element("div");
+  const header = element("div", 60);
+  const body = element("div", 0);
+  const footer = element("div", 72);
+  const handle = element("button", 20);
+  const inertTarget = element("main");
+  const headerLayer = element("div", 40);
+  const bodyLayer = element("div", 320);
+  Object.defineProperty(bodyLayer, "scrollHeight", { value: 320 });
+  const footerLayer = element("div", 72);
+
+  const cleanups = [
+    binding.registerPart("portal", portal),
+    binding.registerPart("backdrop", backdrop),
+    binding.registerPart("viewport", viewport),
+    binding.registerPart("popup", popup),
+    binding.registerPart("content", content),
+    binding.registerPart("header", header),
+    binding.registerPart("body", body),
+    binding.registerPart("footer", footer),
+    binding.registerPart("handle", handle),
+    binding.registerPart("inert-target", inertTarget),
+    binding.registerRegionLayer(
+      "header",
+      { key: "header", layer: "settled" },
+      headerLayer,
+    ),
+    binding.registerRegionLayer(
+      "body",
+      { key: bodyKey, layer: "settled" },
+      bodyLayer,
+    ),
+    binding.registerRegionLayer(
+      "footer",
+      { key: "actions", layer: "settled" },
+      footerLayer,
+    ),
+  ];
+  document.body.append(portal, inertTarget);
+  portal.append(backdrop, viewport);
+  viewport.append(popup);
+  popup.append(content);
+  content.append(header, body, footer);
+  header.append(handle, headerLayer);
+  body.append(bodyLayer);
+  footer.append(footerLayer);
+
+  return {
+    portal,
+    backdrop,
+    viewport,
+    popup,
+    content,
+    header,
+    body,
+    footer,
+    handle,
+    inertTarget,
+    headerLayer,
+    bodyLayer,
+    footerLayer,
+    cleanups,
+  };
+};
+
+const flushAll = async (frames: FakeFrames): Promise<void> => {
+  for (let index = 0; index < 8; index += 1) {
+    if (frames.pending() > 0) frames.flush();
     await Promise.resolve();
   }
 };
 
-describe("bindShellSheetToDom", () => {
-  beforeEach(() => {
-    let nextFrameId = 0;
-    const cancelledFrames = new Set<number>();
-    vi.stubGlobal("ResizeObserver", ResizeObserverStub);
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn().mockReturnValue({ matches: false }),
-    );
-    vi.stubGlobal(
-      "requestAnimationFrame",
-      vi.fn((callback: FrameRequestCallback) => {
-        const id = ++nextFrameId;
-        queueMicrotask(() => {
-          if (!cancelledFrames.has(id)) callback(performance.now());
-        });
-        return id;
-      }),
-    );
-    vi.stubGlobal(
-      "cancelAnimationFrame",
-      vi.fn((id: number) => cancelledFrames.add(id)),
-    );
-
-    document.body.innerHTML = `
-      <button id="trigger">Open</button>
-      <main id="app">Application</main>
-      <div id="root" hidden>
-        <button id="backdrop"></button>
-        <section id="main">
-          <button id="handle">Handle</button>
-          <div id="content"><button id="action">Action</button></div>
-        </section>
-      </div>
-    `;
-  });
-
+describe("target DOM binding", () => {
   afterEach(() => {
-    vi.unstubAllGlobals();
     document.body.innerHTML = "";
   });
 
-  it("opens, manages modal semantics, and closes on Escape", async () => {
-    const animate = vi.fn(() => ({
-      finished: Promise.resolve(),
-      stop: vi.fn(),
-    }));
-    const animation: ShellSheetAnimationDriver = {
-      animate,
-    };
-    const controller = createShellSheetController({
-      snapPoints: [
-        { id: "collapsed", size: { type: "ratio", value: 0.6 } },
-        { id: "expanded", size: { type: "ratio", value: 0.996 } },
-      ],
+  it("uses token-safe dynamic part registration", () => {
+    const harness = createHarness();
+    const controller = createShellSheetController<Snap, Region>(closed());
+    const binding = bindShellSheetToDom(controller, {
+      environment: harness.environment,
+      animation: harness.animation,
     });
-    const trigger = document.querySelector<HTMLButtonElement>("#trigger")!;
-    const app = document.querySelector<HTMLElement>("#app")!;
-    const root = document.querySelector<HTMLElement>("#root")!;
-    const main = document.querySelector<HTMLElement>("#main")!;
-    const content = document.querySelector<HTMLElement>("#content")!;
-    Object.defineProperty(content, "scrollHeight", { value: 320 });
+    const first = element();
+    const second = element();
+    const cleanupFirst = binding.registerPart("popup", first);
+    binding.registerPart("popup", second);
 
-    trigger.focus();
-    const binding = bindShellSheetToDom(
-      controller,
-      {
-        root,
-        main,
-        handle: document.querySelector<HTMLElement>("#handle")!,
-        content,
-        backdrop: document.querySelector<HTMLElement>("#backdrop")!,
-        inertTarget: app,
-      },
-      { animation, reducedMotion: true },
-    );
+    cleanupFirst();
+    expect(binding.getElements().popup).toBe(second);
 
-    expect(root.hidden).toBe(true);
-    expect(main.getAttribute("role")).toBe("dialog");
-    expect(main.getAttribute("aria-modal")).toBe("true");
+    binding.destroy();
+    expect(binding.getElements()).toEqual({
+      portal: null,
+      backdrop: null,
+      viewport: null,
+      popup: null,
+      content: null,
+      header: null,
+      body: null,
+      footer: null,
+      handle: null,
+      inertTarget: null,
+    });
+    expect(() => binding.registerPart("popup", first)).toThrow("destroyed");
+  });
 
-    controller.open();
-    expect(root.hidden).toBe(false);
-    expect(app.inert).toBe(true);
+  it("measures a content target, animates opening, and settles one token", async () => {
+    const harness = createHarness();
+    const controller = createShellSheetController<Snap, Region>(closed());
+    const events: ShellSheetEvent<Snap, Region>[] = [];
+    controller.subscribe((_snapshot, event) => events.push(event));
+    const binding = bindShellSheetToDom(controller, {
+      environment: harness.environment,
+      animation: harness.animation,
+      scrollLock: { acquire: () => () => undefined },
+      backgroundIsolation: { acquire: () => () => undefined },
+    });
+    const anatomy = registerAnatomy(binding);
 
-    await settlePromises();
-    expect(controller.getSnapshot().status).toBe("open");
+    controller.sync(opened("A"));
+    await flushAll(harness.frames);
 
-    document.querySelector<HTMLButtonElement>("#handle")!.click();
-    await settlePromises();
     expect(controller.getSnapshot()).toMatchObject({
-      status: "open",
-      snapPoint: "expanded",
+      phase: "open",
+      settledTarget: { targetId: "A" },
     });
-
-    const heightAnimation = animate.mock.calls.find(
-      ([, keyframes]) => "height" in keyframes,
+    expect(anatomy.popup.style.getPropertyValue("--drawer-height")).toBe(
+      "452px",
     );
-    expect(heightAnimation).toBeDefined();
-    expect(heightAnimation?.[1].height).toEqual([
-      `${window.innerHeight * 0.6}px`,
-      `${window.innerHeight * 0.996}px`,
-    ]);
-
-    document.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-    );
-    await settlePromises();
-
-    expect(controller.getSnapshot().status).toBe("closed");
-    expect(root.hidden).toBe(true);
-    expect(app.inert).not.toBe(true);
-    expect(document.activeElement).toBe(trigger);
-
-    binding.destroy();
-  });
-
-  it("measures framework content before starting the opening animation", async () => {
-    const animate = vi.fn(() => ({
-      finished: Promise.resolve(),
-      stop: vi.fn(),
-    }));
-    const controller = createShellSheetController({
-      snapPoints: [
-        { id: "content", size: { type: "content", maxRatio: 0.9 } },
-      ],
-    });
-    const root = document.querySelector<HTMLElement>("#root")!;
-    const main = document.querySelector<HTMLElement>("#main")!;
-    const content = document.querySelector<HTMLElement>("#content")!;
-    let contentHeight = 0;
-    Object.defineProperty(content, "scrollHeight", {
-      get: () => contentHeight,
-    });
-
-    const binding = bindShellSheetToDom(
-      controller,
-      {
-        root,
-        main,
-        handle: document.querySelector<HTMLElement>("#handle")!,
-        content,
-        backdrop: document.querySelector<HTMLElement>("#backdrop")!,
-      },
-      { animation: { animate }, reducedMotion: false },
-    );
-
-    controller.open();
-    expect(root.hidden).toBe(false);
-    expect(root.style.visibility).toBe("hidden");
-    expect(animate).not.toHaveBeenCalled();
-
-    // Simulates React committing the requested screen after the Effector
-    // event but before the browser's next paint.
-    contentHeight = 420;
-    await settlePromises();
-
-    const openingAnimation = animate.mock.calls.find(
-      ([, keyframes]) => "transform" in keyframes,
-    );
-    expect(openingAnimation?.[1].transform).toEqual([
-      "translateY(420px)",
-      "translateY(0px)",
-    ]);
-    expect(root.style.visibility).toBe("");
-    expect(controller.getSnapshot().status).toBe("open");
-
-    binding.destroy();
-  });
-
-  it("resumes an opening lifecycle when a binding is replaced", async () => {
-    const animate = vi.fn(() => ({
-      finished: Promise.resolve(),
-      stop: vi.fn(),
-    }));
-    const controller = createShellSheetController({
-      snapPoints: [
-        { id: "content", size: { type: "content", maxRatio: 0.9 } },
-      ],
-    });
-    const root = document.querySelector<HTMLElement>("#root")!;
-    const main = document.querySelector<HTMLElement>("#main")!;
-    const content = document.querySelector<HTMLElement>("#content")!;
-    Object.defineProperty(content, "scrollHeight", { value: 360 });
-    const elements = {
-      root,
-      main,
-      handle: document.querySelector<HTMLElement>("#handle")!,
-      content,
-      backdrop: document.querySelector<HTMLElement>("#backdrop")!,
-    };
-
-    const firstBinding = bindShellSheetToDom(controller, elements, {
-      animation: { animate },
-    });
-    controller.open();
-    expect(controller.getSnapshot().status).toBe("opening");
-    firstBinding.destroy();
-
-    const replacementBinding = bindShellSheetToDom(controller, elements, {
-      animation: { animate },
-    });
-    await settlePromises();
-
+    expect(anatomy.popup.dataset.open).toBe("");
+    expect(anatomy.popup.dataset.presentation).toBe("sheet");
+    expect(anatomy.portal.hidden).toBe(false);
     expect(
-      animate.mock.calls.some(([, keyframes]) => "transform" in keyframes),
+      harness.calls.some(
+        (call) =>
+          "transform" in call.keyframes &&
+          Array.from(call.keyframes.transform ?? []).includes("translateY(100%)"),
+      ),
     ).toBe(true);
-    expect(controller.getSnapshot().status).toBe("open");
+    expect(
+      events.filter((event) => event.type === "transition-settled"),
+    ).toHaveLength(1);
 
-    replacementBinding.destroy();
-  });
+    harness.calls.length = 0;
+    controller.sync(closed("closed:after-open"));
+    await flushAll(harness.frames);
 
-  it("keeps background content available in non-modal non-draggable mode", async () => {
-    const animation: ShellSheetAnimationDriver = {
-      animate: () => ({ finished: Promise.resolve(), stop: vi.fn() }),
-    };
-    const controller = createShellSheetController({
-      snapPoints: [
-        { id: "content", size: { type: "content", maxRatio: 0.996 } },
-      ],
-    });
-    const app = document.querySelector<HTMLElement>("#app")!;
-    const root = document.querySelector<HTMLElement>("#root")!;
-    const main = document.querySelector<HTMLElement>("#main")!;
-    const content = document.querySelector<HTMLElement>("#content")!;
-    Object.defineProperty(content, "scrollHeight", { value: 320 });
-
-    const binding = bindShellSheetToDom(
-      controller,
-      {
-        root,
-        main,
-        handle: document.querySelector<HTMLElement>("#handle")!,
-        content,
-        inertTarget: app,
-      },
-      {
-        animation,
-        modality: "non-modal",
-        draggable: false,
-        reducedMotion: true,
-      },
-    );
-
-    controller.open();
-    await settlePromises();
-
-    expect(root.dataset.modality).toBe("non-modal");
-    expect(main.dataset.draggable).toBe("false");
-    expect(main.hasAttribute("aria-modal")).toBe(false);
-    expect(app.inert).not.toBe(true);
-    expect(document.body.style.overflow).toBe("");
-
-    document.querySelector<HTMLButtonElement>("#handle")!.click();
-    expect(controller.getSnapshot().snapPoint).toBe("content");
+    expect(controller.getSnapshot().phase).toBe("closed");
+    expect(anatomy.portal.hidden).toBe(true);
+    expect(
+      harness.calls.some(
+        (call) =>
+          call.element === anatomy.popup &&
+          "transform" in call.keyframes &&
+          Array.from(call.keyframes.transform ?? []).includes("translateY(100%)"),
+      ),
+    ).toBe(true);
+    expect(
+      events.filter((event) => event.type === "transition-settled"),
+    ).toHaveLength(2);
 
     binding.destroy();
   });
 
-  it("corrects a content snap after framework content commits during snapping", async () => {
-    const animate = vi.fn(() => ({
-      finished: Promise.resolve(),
-      stop: vi.fn(),
-    }));
-    const controller = createShellSheetController({
-      snapPoints: [
-        { id: "content", size: { type: "content", maxRatio: 0.8 } },
-        { id: "expanded", size: { type: "ratio", value: 0.95 } },
-      ],
-      initialState: { open: true, snapPoint: "expanded" },
+  it("uses a Portal-sibling isolation strategy when no inert target is registered", async () => {
+    const harness = createHarness();
+    const controller = createShellSheetController<Snap, Region>(closed());
+    const binding = bindShellSheetToDom(controller, {
+      environment: harness.environment,
+      animation: harness.animation,
+      scrollLock: { acquire: () => () => undefined },
     });
-    const root = document.querySelector<HTMLElement>("#root")!;
-    const main = document.querySelector<HTMLElement>("#main")!;
-    const content = document.querySelector<HTMLElement>("#content")!;
-    let contentHeight = 900;
-    Object.defineProperty(content, "scrollHeight", {
-      get: () => contentHeight,
-    });
+    const anatomy = registerAnatomy(binding);
+    anatomy.cleanups[9]?.();
 
-    const binding = bindShellSheetToDom(
-      controller,
-      {
-        root,
-        main,
-        handle: document.querySelector<HTMLElement>("#handle")!,
-        content,
+    controller.sync(opened("modal"));
+    await flushAll(harness.frames);
+    expect(anatomy.inertTarget.inert).toBe(true);
+    expect(anatomy.inertTarget.getAttribute("aria-hidden")).toBe("true");
+
+    controller.sync(closed("modal:closed"));
+    await flushAll(harness.frames);
+    expect(anatomy.inertTarget.inert).toBeUndefined();
+    expect(anatomy.inertTarget.hasAttribute("aria-hidden")).toBe(false);
+
+    binding.destroy();
+  });
+
+  it("crossfades only a changed Body while geometry uses the same coordinator", async () => {
+    const harness = createHarness();
+    const controller = createShellSheetController<Snap, Region>(closed());
+    const binding = bindShellSheetToDom(controller, {
+      environment: harness.environment,
+      animation: harness.animation,
+      scrollLock: { acquire: () => () => undefined },
+      backgroundIsolation: { acquire: () => () => undefined },
+    });
+    const anatomy = registerAnatomy(binding);
+    controller.sync(opened("A"));
+    await flushAll(harness.frames);
+    harness.calls.length = 0;
+
+    const incoming = element("div", 500);
+    Object.defineProperty(incoming, "scrollHeight", { value: 500 });
+    anatomy.body.append(incoming);
+    binding.registerRegionLayer(
+      "body",
+      { key: "details", layer: "incoming" },
+      incoming,
+    );
+    controller.sync(opened("B", "details"));
+    await flushAll(harness.frames);
+
+    const animatedElements = harness.calls.map((call) => call.element);
+    expect(animatedElements).toContain(anatomy.popup);
+    expect(animatedElements).toContain(anatomy.bodyLayer);
+    expect(animatedElements).toContain(incoming);
+    expect(animatedElements).not.toContain(anatomy.headerLayer);
+    expect(animatedElements).not.toContain(anatomy.footerLayer);
+    expect(controller.getSnapshot().settledTarget?.targetId).toBe("B");
+
+    binding.destroy();
+  });
+
+  it("morphs the same Popup between sheet and dialog rects without scaling text", async () => {
+    const harness = createHarness();
+    const controller = createShellSheetController<Snap, Region>(closed());
+    const binding = bindShellSheetToDom(controller, {
+      environment: harness.environment,
+      animation: harness.animation,
+      scrollLock: { acquire: () => () => undefined },
+      backgroundIsolation: { acquire: () => () => undefined },
+    });
+    const anatomy = registerAnatomy(binding);
+    const popupIdentity = anatomy.popup;
+    anatomy.popup.getBoundingClientRect = () => {
+      if (anatomy.popup.dataset.presentation === "dialog") {
+        return {
+          ...rect(452, 320),
+          x: 35,
+          left: 35,
+          right: 355,
+          y: 120,
+          top: 120,
+          bottom: 572,
+        } as DOMRect;
+      }
+      return rect(452, 390);
+    };
+
+    controller.sync(opened("sheet"));
+    await flushAll(harness.frames);
+    harness.calls.length = 0;
+
+    controller.sync(opened("dialog", "summary", "compact", "dialog"));
+    await flushAll(harness.frames);
+
+    expect(binding.getElements().popup).toBe(popupIdentity);
+    const popupMorph = harness.calls.find(
+      (call) => call.element === anatomy.popup && "width" in call.keyframes,
+    );
+    expect(popupMorph?.keyframes).toMatchObject({
+      width: ["390px", "320px"],
+      height: ["452px", "452px"],
+    });
+    expect(String(popupMorph?.keyframes.transform)).not.toContain("scale");
+    expect(anatomy.popup.dataset.presentation).toBe("dialog");
+    expect(anatomy.popup.hasAttribute("data-from-presentation")).toBe(false);
+    expect(anatomy.popup.hasAttribute("data-to-presentation")).toBe(false);
+    expect(anatomy.popup.hasAttribute("data-transitioning")).toBe(false);
+
+    binding.destroy();
+  });
+
+  it("replaces A→B with C from current visual geometry and ignores stale completions", async () => {
+    const harness = createHarness();
+    type DeferredCall = {
+      element: HTMLElement;
+      keyframes: Keyframe[] | PropertyIndexedKeyframes;
+      stop: ReturnType<typeof vi.fn>;
+      resolve(result: { status: "finished" | "cancelled" }): void;
+    };
+    const deferred: DeferredCall[] = [];
+    const animation: ShellAnimationDriver = {
+      animate(animatedElement, keyframes) {
+        let resolve!: DeferredCall["resolve"];
+        const finished = new Promise<{ status: "finished" | "cancelled" }>(
+          (next) => {
+            resolve = next;
+          },
+        );
+        const call = {
+          element: animatedElement,
+          keyframes,
+          stop: vi.fn(),
+          resolve,
+        };
+        deferred.push(call);
+        return { finished, stop: call.stop };
       },
-      { animation: { animate }, reducedMotion: true },
-    );
+    };
+    const controller = createShellSheetController<Snap, Region>(closed());
+    const events: ShellSheetEvent<Snap, Region>[] = [];
+    controller.subscribe((_snapshot, event) => events.push(event));
+    const binding = bindShellSheetToDom(controller, {
+      environment: harness.environment,
+      animation,
+      scrollLock: { acquire: () => () => undefined },
+      backgroundIsolation: { acquire: () => () => undefined },
+    });
+    const anatomy = registerAnatomy(binding);
+    let visibleHeight = 0;
+    anatomy.popup.getBoundingClientRect = () => rect(visibleHeight);
 
-    controller.snapTo("content");
-    contentHeight = 240;
-    binding.refresh();
-    await settlePromises();
+    controller.sync(opened("A"));
+    await flushAll(harness.frames);
+    for (const call of deferred) call.resolve({ status: "finished" });
+    await Promise.resolve();
+    await Promise.resolve();
+    visibleHeight = 452;
+    expect(controller.getSnapshot().settledTarget?.targetId).toBe("A");
 
-    const heightAnimations = animate.mock.calls.filter(
-      ([, keyframes]) => "height" in keyframes,
+    const details = element("div", 500);
+    Object.defineProperty(details, "scrollHeight", { value: 500 });
+    anatomy.body.append(details);
+    binding.registerRegionLayer(
+      "body",
+      { key: "details", layer: "incoming" },
+      details,
     );
-    expect(heightAnimations.at(-1)?.[1].height).toEqual([
-      `${window.innerHeight * 0.8}px`,
-      "240px",
+    const bStart = deferred.length;
+    controller.sync(opened("B", "details"));
+    await flushAll(harness.frames);
+    const bCalls = deferred.slice(bStart);
+    expect(bCalls.length).toBeGreaterThan(0);
+
+    visibleHeight = 510;
+    anatomy.bodyLayer.style.opacity = "0.55";
+    anatomy.bodyLayer.style.filter = "blur(0.9px)";
+    details.style.opacity = "0.45";
+    details.style.filter = "blur(1.1px)";
+    const cStart = deferred.length;
+    controller.sync(opened("C", "summary"));
+    await flushAll(harness.frames);
+    const cCalls = deferred.slice(cStart);
+
+    expect(bCalls.every((call) => call.stop.mock.calls.length === 1)).toBe(true);
+    const cGeometry = cCalls.find(
+      (call) => call.element === anatomy.popup && "height" in call.keyframes,
+    );
+    expect(cGeometry?.keyframes).toMatchObject({
+      height: ["510px", "452px"],
+    });
+    const restoredSummary = cCalls.find(
+      (call) => call.element === anatomy.bodyLayer,
+    );
+    expect(restoredSummary?.keyframes).toMatchObject({ opacity: [0.55, 1] });
+    const cTransitionId = controller.getSnapshot().transitionId;
+
+    for (const call of bCalls) call.resolve({ status: "finished" });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(controller.getSnapshot().transitionId).toBe(cTransitionId);
+    expect(controller.getSnapshot().settledTarget?.targetId).toBe("A");
+
+    for (const call of cCalls) call.resolve({ status: "finished" });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(controller.getSnapshot().settledTarget?.targetId).toBe("C");
+    expect(
+      events.some(
+        (event) => event.type === "transition-replaced" && event.targetId === "B",
+      ),
+    ).toBe(true);
+
+    binding.destroy();
+  });
+
+  it("keeps pointer moves DOM-local and publishes one release request", async () => {
+    const harness = createHarness();
+    const controller = createShellSheetController<Snap, Region>(closed());
+    const binding = bindShellSheetToDom(controller, {
+      environment: harness.environment,
+      animation: harness.animation,
+      scrollLock: { acquire: () => () => undefined },
+      backgroundIsolation: { acquire: () => () => undefined },
+    });
+    const anatomy = registerAnatomy(binding);
+    anatomy.handle.setPointerCapture = vi.fn();
+    const eventTypes: string[] = [];
+    controller.subscribe((_snapshot, event) => eventTypes.push(event.type));
+    controller.sync(opened("A"));
+    await flushAll(harness.frames);
+    eventTypes.length = 0;
+    const handleLabel = document.createElement("span");
+    anatomy.handle.append(handleLabel);
+
+    const pointer = (
+      type: string,
+      y: number,
+      time: number,
+    ): PointerEvent => {
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        clientX: 10,
+        clientY: y,
+        button: 0,
+      }) as PointerEvent;
+      Object.defineProperties(event, {
+        pointerId: { value: 1 },
+        isPrimary: { value: true },
+        timeStamp: { value: time },
+      });
+      return event;
+    };
+
+    handleLabel.dispatchEvent(pointer("pointerdown", 600, 0));
+    handleLabel.dispatchEvent(pointer("pointermove", 560, 20));
+    handleLabel.dispatchEvent(pointer("pointermove", 500, 40));
+    harness.frames.flush();
+
+    expect(eventTypes).toEqual(["interaction-started"]);
+
+    handleLabel.dispatchEvent(pointer("pointerup", 480, 60));
+    expect(eventTypes).toEqual([
+      "interaction-started",
+      "interaction-ended",
+      "snap-requested",
     ]);
+    await flushAll(harness.frames);
+    expect(anatomy.popup.style.height).toBe("452px");
+    expect(
+      anatomy.popup.style.getPropertyValue("--drawer-swipe-movement-y"),
+    ).toBe("0px");
 
     binding.destroy();
   });

@@ -1,5 +1,7 @@
 # `@shell-sheet/effector`
 
+Статус: нормативный target contract v1.
+
 ## 1. Назначение
 
 Effector adapter соединяет application-owned domain state machine с core
@@ -24,7 +26,10 @@ Adapter владеет только attach/detach, доставкой target в 
 Целевой adapter принимает существующие units приложения:
 
 ```ts
-createShellSheetBinding<TSnapPoint, TRegionKey>({
+createShellSheetBinding<
+  TSnapPoint extends string,
+  TRegionKey extends string,
+>({
   $target,
   requestReceived,
   visualFactReceived,
@@ -40,8 +45,12 @@ createShellSheetBinding<TSnapPoint, TRegionKey>({
 - `attach(controller)` для global scope;
 - scope-safe helper или документированный `scopeBind` flow для forked scope.
 
-Convenience model с собственным `$state` MAY существовать отдельным export, но
-не является default binding и не используется приложением с `$flow`.
+Package MUST NOT предоставлять binding/model, владеющий generic `$state`,
+`$open`, `$snapPoint` или reducer переходов. Такой convenience слой создаёт
+конкурирующий источник истины и нарушает `ARCH-EFFECTOR-01`. Будущий
+opinionated application model возможен только как отдельно спроектированный
+application/example module с собственным spec; он не является Effector
+adapter Shell Sheet.
 
 При совместном использовании React application создаёт controller на уровне
 app/scope lifecycle, attach-ит его к binding и передаёт тот же instance в
@@ -69,6 +78,13 @@ stores перед `controller.sync()`.
 Controller request/fact delivery низкочастотна. Pointer move/velocity samples
 не проходят через Effector; adapter получает interaction start/end и один
 release proposal.
+
+Adapter не использует `sample` от visual facts обратно в `$target` внутри
+package. Любая такая обратная связь является явной application policy.
+Attach выполняет initial atomic sync в том же scope, подписывает controller
+ровно один раз и использует token-safe detach: cleanup старого React
+StrictMode lifecycle не может отсоединить более новую attachment. Одновременный
+attach разных controllers в одном binding/scope является development error.
 
 ## 5. Async business flow
 

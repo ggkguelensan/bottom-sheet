@@ -102,6 +102,24 @@ Browser environment, animation/modality drivers и gesture tuning передаю
 только `setInsets`. Поля target (`presentation`, `modality`, `draggable`, snap
 definitions) приходят только через core controller и не дублируются в options.
 
+### 2.1. Единственный mutation owner
+
+Binding является единственным владельцем mechanic DOM mutations экземпляра:
+measured sizes/transforms, transition-layer visibility, lifecycle attributes,
+pointer mechanics, focus/inert и scroll lock. React primitives и Effector
+binding не пишут эти значения параллельно.
+
+Controller subscription, registry cleanup, ResizeObserver, viewport и content
+readiness только планируют coalesced transaction. Исключение — hot gesture
+frame: он может записать ограниченный набор documented drag CSS variables и
+Popup/Backdrop transforms, но не выполняет region swap, target settle или
+application state update.
+
+Animation driver получает готовые keyframes/options от coordinator. Он не
+читает layout и не пишет stable state после terminal result. Так
+`ARCH-DOM-01` сохраняет один transaction clock, а `ARCH-GESTURE-01` — один
+локальный 60fps path.
+
 ## 3. Stable element anatomy
 
 Binding регистрирует parts:

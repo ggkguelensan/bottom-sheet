@@ -134,6 +134,27 @@ latest accepted open/closed target получил terminal settle. Отклон�
 Public styling не зависит от internal classes. `Content` сохраняет Base UI
 Drawer container meaning; Header/Body/Footer образуют Shell-specific layout.
 
+### 4.1. Thin-adapter invariant
+
+React adapter MAY владеть только React-specific lifecycle: context, Portal,
+refs, compound composition, controller/binding creation policy и регистрацию
+parts/region layers. В atomic/external-controller modes он не проецирует
+application domain в target.
+
+React adapter MUST NOT:
+
+- читать `getBoundingClientRect`/`scrollHeight` для visual lifecycle;
+- создавать ResizeObserver, `requestAnimationFrame`, transition timeout или
+  Web Animation ради open/close/snap/region transition;
+- хранить per-frame drag offset/velocity в React state;
+- вызывать animation driver напрямую;
+- реализовывать собственный snap selection или settle token.
+
+После commit adapter только синхронизирует target (если mode владеет этим
+шагом) и регистрирует актуальные DOM nodes. Readiness, measurement, animation
+и terminal cleanup принадлежат DOM binding. Это обязательный seam
+`ARCH-REACT-01`, а не рекомендуемая implementation detail.
+
 `Portal` принимает `container` и `keepMounted`. При `keepMounted` один
 Portal/Popup не remount между open cycles и presentation changes.
 

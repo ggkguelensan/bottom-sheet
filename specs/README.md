@@ -109,6 +109,26 @@ intent
 Эти решения считаются финализированным target v1. Их изменение требует
 явного spec decision до изменения implementation.
 
+### Реестр целевых архитектурных решений
+
+Все пять Strong-кандидатов архитектурного аудита приняты в target v1. Названия
+кандидатов из отчёта ненормативны; нормативны идентификаторы и контракты ниже.
+Каждое решение имеет ровно один module owner и проверяется через публичный
+seam, а не через структуру private helper-файлов.
+
+| ID | Принятое решение | Module owner и public seam | Запрещённая утечка | Нормативное доказательство |
+| --- | --- | --- | --- | --- |
+| `ARCH-CORE-01` | Core является глубоким semantic engine | `@shell-sheet/core`: atomic `sync(target)`, requests/facts, cached snapshot, pure geometry algorithms | DOM elements, browser clock, live drag pixels, React/Effector state | [`modules/core.md`](./modules/core.md), core contract tests |
+| `ARCH-DOM-01` | Вся browser mechanics скрыта за одним binding | `@shell-sheet/dom`: `bind/register/setInsets/refresh/destroy` | React-owned measurements/timers, прямые lifecycle writes из adapters, несколько несвязанных animation clocks | [`modules/dom.md`](./modules/dom.md), fake-environment и browser contract tests |
+| `ARCH-GESTURE-01` | Hot pointer loop остаётся DOM-local | DOM gesture session + один semantic release request через Core | per-frame Core facts, Effector events или React renders | [`modules/dom.md`](./modules/dom.md#10-gesture-session), performance/browser tests |
+| `ARCH-REACT-01` | React является registration/composition adapter | `@shell-sheet/react`: compound parts, refs, region registration, Portal lifecycle | snap/gesture algorithms, DOM measurements, animation timers, business `kind/uiContext` | [`modules/react.md`](./modules/react.md), React/SSR contract tests |
+| `ARCH-EFFECTOR-01` | Effector binding транспортирует application-owned target | `@shell-sheet/effector`: attach/detach, atomic target sync, typed request/fact delivery | adapter-owned generic `$state`, `$open`, `$snapPoint` или domain transitions | [`modules/effector.md`](./modules/effector.md), global/forked-scope contract tests |
+
+Изменение, нарушающее столбец «Запрещённая утечка», является архитектурной
+регрессией даже при сохранении текущего визуального поведения. Изменить один
+из этих seams можно только одновременным изменением этого реестра,
+`architecture.md`, module spec и соответствующего contract test.
+
 ## Изменение спецификаций
 
 - Изменение public API MUST обновить module spec и compatibility notes.

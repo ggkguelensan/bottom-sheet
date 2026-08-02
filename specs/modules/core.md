@@ -16,6 +16,11 @@ Core MUST работать без DOM, browser globals, React, Motion, Effector,
 application domain. Он не измеряет элементы, не анимирует и не решает
 бизнес-переходы.
 
+Core MAY принимать агрегированное release evidence в CSS pixels
+(`distance/velocity/projectedHeight`) для pure destination selection. Эти
+значения описывают один завершённый intent и не становятся live visual state:
+они не сохраняются в snapshot и не публикуются на каждом pointer frame.
+
 Controller всегда **target-driven**. Отдельного authoritative uncontrolled
 state в core нет. Convenience `defaultOpen`/`defaultSnapPoint` в React adapter
 может владеть локальным target и передавать его тем же `sync()` protocol.
@@ -43,6 +48,10 @@ type ShellSheetController<
 
 Public API не экспортирует mutable internal collections и не требует class
 inheritance.
+
+Этот seam реализует `ARCH-CORE-01`: новый public method допустим только если он
+выражает semantic target/request/fact или детерминированный pure algorithm.
+Методы вида `updateDrag`, `setHeight`, `measure` или `animate` запрещены.
 
 ## 3. Atomic target
 

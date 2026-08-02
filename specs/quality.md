@@ -76,9 +76,28 @@ failing behavioral test, минимальный проходящий implementat
 slice. Массовый горизонтальный набор tests до первого работающего slice
 запрещён.
 
+### Architecture decision gates
+
+Strong-решения из
+[`README.md`](./README.md#реестр-целевых-архитектурных-решений) получают
+отдельные regression assertions:
+
+| Decision | Обязательное positive proof | Обязательное negative proof |
+| --- | --- | --- |
+| `ARCH-CORE-01` | atomic target, FIFO events, tokenized terminal lifecycle и pure geometry проходят через public Core API | compile/source boundary не допускает DOM libs/globals и public `updateDrag/setHeight/measure/animate` |
+| `ARCH-DOM-01` | fake environment фиксирует `measure → mutate → next-frame animate → settle`, stale-safe registry и interruption | instrumentation не обнаруживает layout read после первого mechanic write одной transaction; adapters не запускают второй lifecycle clock |
+| `ARCH-GESTURE-01` | browser test получает ровно один semantic release request с корректной projected destination | серия pointer moves не меняет Core snapshot и не вызывает Core/Effector/React subscriber на frame |
+| `ARCH-REACT-01` | compound refs/regions регистрируются token-safe в StrictMode и один Popup переживает transitions | source/behavior checks не находят React-owned measurement, rAF/timeout или animation-driver invocation |
+| `ARCH-EFFECTOR-01` | application `$target` атомарно sync-ится в global/forked scope, requests/facts сохраняют order | public binding не экспортирует/создаёт generic `$state`, `$open`, `$snapPoint` и не строит feedback loop из facts |
+
+Negative source-boundary checks дополняют behavioral tests, но не заменяют их:
+проверка имени файла или private function сама по себе не доказывает
+архитектурный seam.
+
 ## 3. Determinism
 
-Unit/contract tests используют injected clock, measurements and viewport. Они
+Unit/contract tests используют injected `ShellSheetDomEnvironment`, fake
+measurements/viewport signals и controlled animation-driver completions. Они
 не зависят от wall-clock duration и не исправляют гонки увеличением timeout.
 Каждый interrupted transition проверяет terminal result и отсутствие позднего
 settle.

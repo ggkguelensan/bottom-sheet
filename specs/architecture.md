@@ -672,7 +672,8 @@ API следует общей анатомии Base UI Drawer, но runtime-за
 
 Правила:
 
-- `Root` не создаёт DOM и владеет context/coordinator.
+- `Root` не создаёт DOM nodes и владеет только React context, composition и
+  lifecycle binding; единственный visual coordinator принадлежит DOM adapter.
 - `Portal keepMounted` сохраняет singleton DOM между открытиями.
 - `Popup` является единственной анимируемой поверхностью.
 - `Content` сохраняет Base UI Drawer container semantics и содержит три
@@ -746,6 +747,42 @@ Demo получает `FlowState` и `ShellTarget` одним React render. `kin
 - atomic target/Base-shaped convenience props и `ShellSheetApi`;
 - React/ReactDOM только peer dependencies.
 
+### 8.1. Два разрешённых runtime loop
+
+Архитектура разделяет низкочастотный semantic loop и покадровый visual loop.
+Они встречаются только на release/target boundary:
+
+```text
+semantic loop
+application $flow → $shellTarget → Core sync → DOM coordinator
+application $flow ← request handler ← Core request ← DOM release/API
+application analytics ← Core visual fact ← DOM terminal lifecycle
+
+hot visual loop
+PointerEvent → DOM gesture session → coalesced rAF → mechanic styles
+                                      └─ release ─→ one Core request
+```
+
+Нормативные правила seam:
+
+- Core является единственной границей identity/order для requests, targets и
+  facts; adapters не пересылают друг другу скрытые lifecycle callbacks.
+- DOM является единственным владельцем mutable visual state, measurements,
+  pointer samples и mechanic DOM writes.
+- Animation driver исполняет переданные keyframes и сообщает result, но не
+  измеряет DOM, не выбирает target и не вызывает Core самостоятельно.
+- React регистрирует DOM parts/layers и отображает application content, но не
+  запускает собственный visual transition.
+- Effector синхронизирует полный target и принимает semantic requests/facts,
+  но не наблюдает каждый pointer frame.
+- Ни один adapter не может обойти `controller.sync()` и непосредственно
+  объявить proposal authoritative target.
+
+Это разделение реализует `ARCH-CORE-01`…`ARCH-EFFECTOR-01` из
+[`README.md`](./README.md#реестр-целевых-архитектурных-решений). Любой новый
+public callback или store должен быть отнесён к одному из двух loop до
+добавления в API.
+
 ## 9. Сквозные проектные инварианты
 
 ### 9.1. Accessibility двух visual layers
@@ -779,21 +816,28 @@ accessibility tree активен только один смысловой сл�
 
 ### 9.3. Детерминированное окружение
 
-Драйверы внешней среды внедряются и имеют contract tests:
+Nondeterministic browser capabilities внедряются только через DOM binding:
 
 ```ts
-type ShellSheetEnvironment = {
-  animation: ShellSheetAnimationDriver;
-  measurements: ShellSheetMeasurementDriver;
-  clock: ShellSheetClock;
-  viewport: ShellSheetViewportDriver;
-};
+bindShellSheetToDom(controller, {
+  environment,
+  animation,
+  scrollLock,
+  backgroundIsolation,
+});
 ```
 
-Unit tests не ждут реальные 220–280 ms. Fake clock и fake measurements должны
-детерминированно воспроизводить interruption, ResizeObserver, drag release,
-viewport resize и late completion. Один набор contract tests запускается для
-native и Motion animation drivers.
+`ShellSheetDomEnvironment` инкапсулирует animation-frame scheduling, computed
+style, ResizeObserver, VisualViewport, matchMedia и document visibility.
+Animation и optional modality drivers являются отдельными ports: они не
+маскируются универсальным `clock`/`measurements` abstraction и не получают
+доступ к controller. Exact interface принадлежит
+[`modules/dom.md`](./modules/dom.md#2-public-binding-surface).
+
+Unit tests не ждут реальные 220–280 ms. Fake environment и controlled driver
+completions должны детерминированно воспроизводить interruption,
+ResizeObserver, drag release, viewport resize и late completion. Один набор
+animation contract tests запускается для native и Motion drivers.
 
 ### 9.4. Публичный headless styling contract
 

@@ -35,6 +35,7 @@ describe("Lovecraft application state machine", () => {
       kind: "arkham.b",
       uiContext: { snapPoint: "expanded", evidenceCount: 3 },
       revision: 7,
+      mobile: false,
       presentation: "dialog",
       preferredPresentation: "dialog",
       direction: "forward",
@@ -54,6 +55,31 @@ describe("Lovecraft application state machine", () => {
         header: { key: "arkham:archive" },
         body: { key: "arkham:b:expanded" },
       },
+    });
+  });
+
+  it("keeps the actual presentation a sheet on mobile while preserving the desktop preference", () => {
+    const deferred = deferredLoader();
+    const model = createLovecraftDemoModel(deferred.loader);
+    const scope = fork();
+    const resolveResponsive = scopeBind(model.responsivePresentationResolved, { scope });
+    const choosePresentation = scopeBind(model.presentationChanged, { scope });
+    const openEntrance = scopeBind(model.entranceOpened, { scope });
+
+    resolveResponsive({ mobile: true, initial: true });
+    choosePresentation("dialog");
+    openEntrance("arkham");
+    expect(scope.getState(model.$state)).toMatchObject({
+      kind: "arkham.a",
+      mobile: true,
+      presentation: "sheet",
+      preferredPresentation: "dialog",
+    });
+
+    resolveResponsive({ mobile: false, initial: false });
+    expect(scope.getState(model.$state)).toMatchObject({
+      presentation: "dialog",
+      preferredPresentation: "dialog",
     });
   });
 

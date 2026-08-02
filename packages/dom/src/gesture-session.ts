@@ -100,6 +100,7 @@ export function createGestureSession<
     ) {
       options.controller.cancelInteraction(session.interactionId, reason);
     }
+    options.getRegistry().elements.popup?.removeAttribute("data-swiping");
     pointer = null;
     options.reconcile();
   };
@@ -168,20 +169,18 @@ export function createGestureSession<
     }
     const geometry = options.getGeometry();
     if (!geometry) return;
+    const liveHeight =
+      options.getRegistry().elements.popup?.getBoundingClientRect().height ??
+      geometry.targetHeight;
+    const startHeight = liveHeight > 0 ? liveHeight : geometry.targetHeight;
     pointer = {
       pointerId: event.pointerId,
       origin,
       area,
       startX: event.clientX,
       startY: event.clientY,
-      startHeight:
-        geometry.currentRect.height > 0
-          ? geometry.currentRect.height
-          : geometry.targetHeight,
-      currentHeight:
-        geometry.currentRect.height > 0
-          ? geometry.currentRect.height
-          : geometry.targetHeight,
+      startHeight,
+      currentHeight: startHeight,
       accepted: false,
       interactionId: null,
       frame: null,
@@ -209,8 +208,16 @@ export function createGestureSession<
       }
       session.accepted = true;
       session.interactionId = options.controller.beginInteraction(session.origin);
+      options.getRegistry().elements.popup?.setAttribute("data-swiping", "");
       suppressHandleClick = true;
-      session.area.setPointerCapture(event.pointerId);
+      try {
+        session.area.setPointerCapture(event.pointerId);
+      } catch {
+        // The pointer may disappear between threshold acceptance and capture
+        // (for example during an OS gesture or synthetic cancellation).
+        cancelPointer("capture-lost", true);
+        return;
+      }
     }
 
     event.preventDefault();
@@ -282,6 +289,7 @@ export function createGestureSession<
       projectedHeight: session.currentHeight - velocity * projectionTime,
     };
     options.controller.endInteraction(session.interactionId);
+    options.getRegistry().elements.popup?.removeAttribute("data-swiping");
     pointer = null;
     if (destination.type === "close") {
       options.controller.requestClose("gesture", {

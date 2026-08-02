@@ -14,6 +14,7 @@ import {
   defaultScrollLockDriver,
 } from "./modality-manager.js";
 import { createNativeAnimationDriver } from "./native-animation.js";
+import { createMechanicLedger } from "./mechanic-ledger.js";
 import { createShellSheetRegistry } from "./registry.js";
 import { applyStructuralMechanics } from "./styling-projection.js";
 import type {
@@ -60,33 +61,6 @@ const assertInsets = (insets: ShellSheetInsets): void => {
   }
 };
 
-const restoreMechanicStyles = (elements: ShellSheetElements): void => {
-  for (const element of Object.values(elements)) {
-    if (!element) continue;
-    for (const attribute of [...element.attributes]) {
-      if (
-        attribute.name.startsWith("data-shell-sheet-") ||
-        [
-          "data-open",
-          "data-closed",
-          "data-starting-style",
-          "data-ending-style",
-          "data-expanded",
-          "data-swiping",
-          "data-swipe-dismiss",
-          "data-transitioning",
-          "data-presentation",
-          "data-modality",
-          "data-from-presentation",
-          "data-to-presentation",
-        ].includes(attribute.name)
-      ) {
-        element.removeAttribute(attribute.name);
-      }
-    }
-  }
-};
-
 export function bindShellSheetToDom<
   TSnap extends string,
   TRegionKey extends string,
@@ -107,6 +81,8 @@ export function bindShellSheetToDom<
   let viewportCleanup: (() => void) | null = null;
   let documentCleanup: (() => void) | null = null;
   let backdropCleanup: (() => void) | null = null;
+  let openFocusOrigin: HTMLElement | null = null;
+  const mechanicLedger = createMechanicLedger();
 
   const ensureActive = (): void => {
     if (destroyed) throw new Error("ShellSheet DOM binding has been destroyed.");
@@ -167,6 +143,22 @@ export function bindShellSheetToDom<
           : snapshot.settledTarget;
       const popup = elements.popup;
       if (!popup || !visualTarget) return;
+      if (
+        snapshot.authoritativeTarget?.open === true &&
+        snapshot.settledTarget === null &&
+        openFocusOrigin === null
+      ) {
+        const HTMLElementConstructor =
+          popup.ownerDocument.defaultView?.HTMLElement;
+        const activeElement = popup.ownerDocument.activeElement;
+        if (
+          HTMLElementConstructor &&
+          activeElement instanceof HTMLElementConstructor &&
+          !popup.contains(activeElement)
+        ) {
+          openFocusOrigin = activeElement;
+        }
+      }
       popup.setAttribute("role", "dialog");
       if (visualTarget.modality === "modal") {
         popup.setAttribute("aria-modal", "true");
@@ -187,8 +179,12 @@ export function bindShellSheetToDom<
       }
     },
     onAfterHidden() {
-      modality.release(true);
+      modality.release(false);
       registry.getSnapshot().elements.popup?.removeAttribute("aria-modal");
+      if (openFocusOrigin?.isConnected) {
+        openFocusOrigin.focus({ preventScroll: true });
+      }
+      openFocusOrigin = null;
     },
   });
 
@@ -309,6 +305,7 @@ export function bindShellSheetToDom<
     registerPart(part, element) {
       ensureActive();
       maybeCreateEnvironment(part, element);
+      mechanicLedger.capturePart(part, element);
       if (part === "portal") {
         element.setAttribute("data-shell-sheet-portal", "");
         const snapshot = controller.getSnapshot();
@@ -326,6 +323,7 @@ export function bindShellSheetToDom<
     },
     registerRegionLayer(region, layer, element) {
       ensureActive();
+      mechanicLedger.captureRegionLayer(element);
       const cleanup = registry.registerRegionLayer(region, layer, element);
       return () => cleanup();
     },
@@ -353,7 +351,6 @@ export function bindShellSheetToDom<
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      const elements = registry.getSnapshot().elements;
       gesture.destroy();
       coordinator.destroy();
       unsubscribeController();
@@ -362,7 +359,8 @@ export function bindShellSheetToDom<
       documentCleanup?.();
       backdropCleanup?.();
       modality.release(true);
-      restoreMechanicStyles(elements);
+      openFocusOrigin = null;
+      mechanicLedger.restoreAll();
       registry.clear();
       geometry = null;
     },

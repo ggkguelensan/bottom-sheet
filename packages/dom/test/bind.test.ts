@@ -110,10 +110,16 @@ const createHarness = () => {
     element: HTMLElement;
     keyframes: Keyframe[] | PropertyIndexedKeyframes;
     duration: number;
+    easing: string;
   }> = [];
   const animation: ShellAnimationDriver = {
     animate(element, keyframes, options) {
-      calls.push({ element, keyframes, duration: options.durationMs });
+      calls.push({
+        element,
+        keyframes,
+        duration: options.durationMs,
+        easing: options.easing,
+      });
       return {
         finished: Promise.resolve({ status: "finished" }),
         stop: vi.fn(),
@@ -260,6 +266,59 @@ describe("target DOM binding", () => {
     expect(() => binding.registerPart("popup", first)).toThrow("destroyed");
   });
 
+  it("restores only adapter-owned mechanic properties and attributes on destroy", () => {
+    const harness = createHarness();
+    const controller = createShellSheetController<Snap, Region>(closed());
+    const binding = bindShellSheetToDom(controller, {
+      environment: harness.environment,
+      animation: harness.animation,
+    });
+    const portal = element();
+    const popup = element();
+    const body = element();
+    const layer = element();
+    portal.style.visibility = "collapse";
+    popup.style.height = "13px";
+    popup.style.minHeight = "5px";
+    popup.style.setProperty("--drawer-height", "7px");
+    popup.style.setProperty("--consumer-color", "rebeccapurple");
+    popup.setAttribute("data-open", "consumer-value");
+    popup.setAttribute("role", "alert");
+    popup.setAttribute("data-consumer", "preserved");
+    body.style.overflowY = "visible";
+    layer.style.alignSelf = "center";
+    layer.setAttribute("aria-hidden", "false");
+
+    binding.registerPart("portal", portal);
+    binding.registerPart("popup", popup);
+    binding.registerPart("body", body);
+    binding.registerRegionLayer(
+      "body",
+      { key: "summary", layer: "settled" },
+      layer,
+    );
+
+    expect(popup.style.minHeight).toBe("0px");
+    expect(body.style.overflowY).toBe("auto");
+    expect(layer.style.alignSelf).toBe("start");
+    binding.destroy();
+
+    expect(portal.style.visibility).toBe("collapse");
+    expect(portal.hasAttribute("data-shell-sheet-portal")).toBe(false);
+    expect(popup.style.height).toBe("13px");
+    expect(popup.style.minHeight).toBe("5px");
+    expect(popup.style.getPropertyValue("--drawer-height")).toBe("7px");
+    expect(popup.style.getPropertyValue("--consumer-color")).toBe(
+      "rebeccapurple",
+    );
+    expect(popup.getAttribute("data-open")).toBe("consumer-value");
+    expect(popup.getAttribute("role")).toBe("alert");
+    expect(popup.getAttribute("data-consumer")).toBe("preserved");
+    expect(body.style.overflowY).toBe("visible");
+    expect(layer.style.alignSelf).toBe("center");
+    expect(layer.getAttribute("aria-hidden")).toBe("false");
+  });
+
   it("measures a content target, animates opening, and settles one token", async () => {
     const harness = createHarness();
     const controller = createShellSheetController<Snap, Region>(closed());
@@ -316,6 +375,38 @@ describe("target DOM binding", () => {
     ).toHaveLength(2);
 
     binding.destroy();
+  });
+
+  it("falls back from invalid CSS timing tokens and warns once per value", async () => {
+    const harness = createHarness();
+    const controller = createShellSheetController<Snap, Region>(closed());
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const binding = bindShellSheetToDom(controller, {
+      environment: harness.environment,
+      animation: harness.animation,
+      scrollLock: { acquire: () => () => undefined },
+      backgroundIsolation: { acquire: () => () => undefined },
+    });
+    const anatomy = registerAnatomy(binding);
+    anatomy.popup.style.setProperty("--shell-sheet-open-duration", "later");
+    anatomy.popup.style.setProperty("--shell-sheet-easing-enter", "spring(4)");
+
+    controller.sync(opened("invalid-timing"));
+    await flushAll(harness.frames);
+    const entrance = harness.calls.find(
+      (call) => call.element === anatomy.popup && "transform" in call.keyframes,
+    );
+    expect(entrance).toMatchObject({
+      duration: 280,
+      easing: "cubic-bezier(0.32, 0.72, 0, 1)",
+    });
+    expect(warning).toHaveBeenCalledTimes(2);
+
+    controller.sync(closed("invalid-timing:closed"));
+    await flushAll(harness.frames);
+    expect(warning).toHaveBeenCalledTimes(2);
+    binding.destroy();
+    warning.mockRestore();
   });
 
   it("uses a Portal-sibling isolation strategy when no inert target is registered", async () => {

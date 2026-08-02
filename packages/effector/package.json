@@ -15,7 +15,7 @@
     "@shell-sheet/core": "0.1.0"
   },
   "peerDependencies": {
-    "effector": ">=23.0.0"
+    "effector": "^23.0.0"
   },
   "scripts": {
     "build": "tsc -b"

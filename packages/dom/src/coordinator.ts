@@ -74,19 +74,41 @@ const presentationChanged = <TSnap extends string, TRegionKey extends string>(
 ): previous is ShellSheetOpenTarget<TSnap, TRegionKey> =>
   previous !== null && previous.presentation !== target.presentation;
 
-const parseDuration = (raw: string, fallback: number): number => {
+const parseDuration = (raw: string): number | null => {
   const value = raw.trim();
-  if (value.length === 0) return fallback;
+  if (value.length === 0) return null;
   const match = /^(-?(?:\d+\.?\d*|\.\d+))(ms|s)$/.exec(value);
-  if (!match) return fallback;
+  if (!match) return null;
   const amount = Number(match[1]);
-  if (!Number.isFinite(amount) || amount < 0) return fallback;
+  if (!Number.isFinite(amount) || amount < 0) return null;
   return match[2] === "s" ? amount * 1_000 : amount;
+};
+
+const easingKeywords = new Set([
+  "linear",
+  "ease",
+  "ease-in",
+  "ease-out",
+  "ease-in-out",
+]);
+
+const validEasing = (raw: string): boolean => {
+  if (easingKeywords.has(raw)) return true;
+  const match = /^cubic-bezier\(([^)]+)\)$/.exec(raw);
+  if (!match) return false;
+  const values = match[1]!.split(",").map((value) => Number(value.trim()));
+  return values.length === 4 &&
+    values.every(Number.isFinite) &&
+    values[0]! >= 0 &&
+    values[0]! <= 1 &&
+    values[2]! >= 0 &&
+    values[2]! <= 1;
 };
 
 const readTiming = (
   popup: HTMLElement,
   environment: ShellSheetDomEnvironment,
+  warn: (property: string, value: string) => void,
 ) => {
   const style = environment.getComputedStyle(popup);
   const easingEnter = style
@@ -95,27 +117,37 @@ const readTiming = (
   const easingChange = style
     .getPropertyValue("--shell-sheet-easing-change")
     .trim();
+  const duration = (property: string, fallback: number): number => {
+    const raw = style.getPropertyValue(property).trim();
+    const parsed = parseDuration(raw);
+    if (parsed !== null) return parsed;
+    if (raw.length > 0) warn(property, raw);
+    return fallback;
+  };
+  const easing = (property: string, raw: string, fallback: string): string => {
+    if (raw.length === 0) return fallback;
+    if (validEasing(raw)) return raw;
+    warn(property, raw);
+    return fallback;
+  };
   return {
-    open: parseDuration(
-      style.getPropertyValue("--shell-sheet-open-duration"),
-      DEFAULT_TIMING.open,
-    ),
-    close: parseDuration(
-      style.getPropertyValue("--shell-sheet-close-duration"),
-      DEFAULT_TIMING.close,
-    ),
-    geometry: parseDuration(
-      style.getPropertyValue("--shell-sheet-geometry-duration"),
+    open: duration("--shell-sheet-open-duration", DEFAULT_TIMING.open),
+    close: duration("--shell-sheet-close-duration", DEFAULT_TIMING.close),
+    geometry: duration(
+      "--shell-sheet-geometry-duration",
       DEFAULT_TIMING.geometry,
     ),
-    region: parseDuration(
-      style.getPropertyValue("--shell-sheet-region-duration"),
-      DEFAULT_TIMING.region,
+    region: duration("--shell-sheet-region-duration", DEFAULT_TIMING.region),
+    easingEnter: easing(
+      "--shell-sheet-easing-enter",
+      easingEnter,
+      DEFAULT_TIMING.easingEnter,
     ),
-    easingEnter:
-      easingEnter.length > 0 ? easingEnter : DEFAULT_TIMING.easingEnter,
-    easingChange:
-      easingChange.length > 0 ? easingChange : DEFAULT_TIMING.easingChange,
+    easingChange: easing(
+      "--shell-sheet-easing-change",
+      easingChange,
+      DEFAULT_TIMING.easingChange,
+    ),
   };
 };
 
@@ -148,6 +180,15 @@ export function createTransitionCoordinator<
   let pendingTransitionId: number | null = null;
   let currentHeight: number | null = null;
   let openingPrepared = false;
+  const warnedTiming = new Set<string>();
+  const warnInvalidTiming = (property: string, value: string): void => {
+    const signature = `${property}:${value}`;
+    if (warnedTiming.has(signature)) return;
+    warnedTiming.add(signature);
+    globalThis.console?.warn(
+      `ShellSheet ignored invalid ${property} value "${value}" and used its default.`,
+    );
+  };
 
   const stopActive = (): void => {
     const attempt = active;
@@ -365,7 +406,7 @@ export function createTransitionCoordinator<
       popup.style.removeProperty("opacity");
       return;
     }
-    const timing = readTiming(popup, environment);
+    const timing = readTiming(popup, environment, warnInvalidTiming);
     const computedPopup = environment.getComputedStyle(popup);
     const fromHeight =
       geometry.currentRect.height > 0
@@ -389,6 +430,8 @@ export function createTransitionCoordinator<
         });
       }
     }
+    const openingFromClosed =
+      authoritative.open && snapshot.settledTarget === null && active === null;
     stopActive();
     if (animateFrame !== null) {
       environment.cancelAnimationFrame(animateFrame);
@@ -401,7 +444,9 @@ export function createTransitionCoordinator<
     const transitionSnapshot = options.controller.getSnapshot();
     options.onBeforeVisible(transitionSnapshot);
     projectStableState(transitionSnapshot, registry, geometry);
-    popup.style.height = `${fromHeight}px`;
+    popup.style.height = `${
+      openingFromClosed ? geometry.targetHeight : fromHeight
+    }px`;
     portal.style.removeProperty("visibility");
     portal.style.removeProperty("pointer-events");
 
@@ -486,7 +531,7 @@ export function createTransitionCoordinator<
             ),
           );
         }
-      } else if (snapshot.settledTarget === null) {
+      } else if (openingFromClosed) {
         const presentation = authoritative.presentation;
         const startTransform =
           reduceMotion || presentation === "dialog"
@@ -607,10 +652,17 @@ export function createTransitionCoordinator<
         });
         return;
       } else {
+        const continuingInitialOpen = snapshot.settledTarget === null;
         controls.push(
           options.animation.animate(
             popup,
-            { height: [`${fromHeight}px`, `${geometry.targetHeight}px`] },
+            continuingInitialOpen
+              ? {
+                  height: [`${fromHeight}px`, `${geometry.targetHeight}px`],
+                  transform: [currentTransform, "translateY(0px)"],
+                  opacity: [Number(currentOpacity), 1],
+                }
+              : { height: [`${fromHeight}px`, `${geometry.targetHeight}px`] },
             {
               durationMs:
                 instant ||

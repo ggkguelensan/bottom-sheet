@@ -73,6 +73,14 @@ export const applyStructuralMechanics = <TRegionKey extends string>(
     footer.style.gridTemplateRows = "auto";
     footer.style.minBlockSize = "0";
   }
+  for (const layers of registry.regionLayers.values()) {
+    for (const layer of layers.values()) {
+      // Region hosts may grow to fill the three-row shell grid. Keeping the
+      // visual layer intrinsically sized lets content snap points measure the
+      // content itself instead of the available Body track.
+      layer.element.style.alignSelf = "start";
+    }
+  }
 };
 
 const highestPhysicalPoint = <TSnap extends string>(

@@ -1,0 +1,14 @@
+{
+  "name": "shell-sheet-react19-compatibility",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@shell-sheet/core": "file:../../packages/core",
+    "@shell-sheet/dom": "file:../../packages/dom",
+    "@shell-sheet/react": "file:../../packages/react",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  }
+}

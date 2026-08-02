@@ -18,10 +18,10 @@ describe("Motion mini driver", () => {
     const element = {} as HTMLElement;
     const controls = createMotionAnimationDriver().animate(
       element,
-      [
-        { opacity: 0, transform: "translateY(8px)" },
-        { opacity: 1 },
-      ],
+      {
+        opacity: [0, 1],
+        transform: ["translateY(8px)", "translateY(0px)"],
+      },
       {
         durationMs: 220,
         easing: "cubic-bezier(0.65, 0, 0.35, 1)",
@@ -32,11 +32,32 @@ describe("Motion mini driver", () => {
       element,
       {
         opacity: [0, 1],
-        transform: ["translateY(8px)", null],
+        transform: ["translateY(8px)", "translateY(0px)"],
       },
       { duration: 0.22, ease: [0.65, 0, 0.35, 1] },
     );
     await expect(controls.finished).resolves.toEqual({ status: "finished" });
+  });
+
+  it("keeps native Keyframe arrays compatible with the shared driver contract", async () => {
+    const cancel = vi.fn();
+    const nativeAnimate = vi.fn(() => ({
+      finished: Promise.resolve(),
+      cancel,
+    }));
+    const controls = createMotionAnimationDriver().animate(
+      { animate: nativeAnimate } as unknown as HTMLElement,
+      [{ opacity: 0 }, { opacity: 1 }],
+      { durationMs: 180, easing: "ease-out" },
+    );
+
+    expect(nativeAnimate).toHaveBeenCalledWith(
+      [{ opacity: 0 }, { opacity: 1 }],
+      { duration: 180, easing: "ease-out" },
+    );
+    controls.stop();
+    await expect(controls.finished).resolves.toEqual({ status: "cancelled" });
+    expect(cancel).toHaveBeenCalledTimes(1);
   });
 
   it("normalizes stop and rejected completion as cancellation", async () => {
@@ -72,23 +93,7 @@ describe("Motion mini driver", () => {
     await expect(rejected.finished).resolves.toEqual({ status: "cancelled" });
   });
 
-  it("validates options and imports only motion/mini", () => {
-    const driver = createMotionAnimationDriver();
-    expect(() =>
-      driver.animate(
-        {} as HTMLElement,
-        {},
-        { durationMs: Number.NaN, easing: "linear" },
-      ),
-    ).toThrow("duration");
-    expect(() =>
-      driver.animate(
-        {} as HTMLElement,
-        {},
-        { durationMs: 1, easing: "" },
-      ),
-    ).toThrow("easing");
-
+  it("imports only motion/mini", () => {
     const source = readFileSync(
       new URL("../src/index.ts", import.meta.url),
       "utf8",

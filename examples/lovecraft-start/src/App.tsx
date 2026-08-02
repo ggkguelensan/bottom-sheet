@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@base-ui/react/button";
 import { useUnit } from "effector-react";
 import { ShellSheet } from "@shell-sheet/react";
@@ -56,7 +56,11 @@ function LocationCard({
   onEnter(id: LocationId): void;
 }>) {
   return (
-    <article className={styles.card} style={{ "--location-image": `url(${location.image})` } as React.CSSProperties}>
+    <article
+      className={styles.card}
+      data-location={location.id}
+      style={{ "--location-image": `url(${location.image})` } as React.CSSProperties}
+    >
       <Button
         className={styles.cardMain}
         onClick={() => onInspect(location.id)}
@@ -425,7 +429,7 @@ function ShellSingleton({ state }: Readonly<{ state: DemoState }>) {
       <ShellSheet.Portal keepMounted className={styles.portal}>
         <ShellSheet.Backdrop className={styles.backdrop} />
         <ShellSheet.Viewport className={styles.viewport}>
-          <ShellSheet.Popup className={styles.popup}>
+          <ShellSheet.Popup className={styles.popup} data-demo-kind={state.kind}>
             <ShellSheet.Content className={styles.sheetContent}>
               <ShellSheet.Header className={`${styles.sheetHeader} ${state.kind === "antarctica" ? styles.sheetHeaderMedia : ""}`}>
                 <ShellSheet.Handle className={styles.handle}><span /></ShellSheet.Handle>
@@ -462,8 +466,10 @@ export function App({ variant, replay, onVariantChange, onReplay }: AppProps) {
     presentation: runtime.model.presentationChanged,
     responsive: runtime.model.responsivePresentationResolved,
   });
+  const [hydrated, setHydrated] = useState(false);
   const initialResponsive = useRef(true);
   useEffect(() => {
+    setHydrated(true);
     const query = window.matchMedia("(max-width: 720px)");
     const update = (): void => {
       responsive({ mobile: query.matches, initial: initialResponsive.current });
@@ -475,7 +481,13 @@ export function App({ variant, replay, onVariantChange, onReplay }: AppProps) {
   }, [responsive]);
 
   return (
-    <div className={styles.app} data-variant={variant} data-replay={replay}>
+    <div
+      className={styles.app}
+      data-variant={variant}
+      data-replay={replay}
+      data-demo-state={state.kind}
+      data-hydrated={hydrated ? "" : undefined}
+    >
       <PrototypePicker value={variant} onChange={onVariantChange} onReplay={onReplay} />
       <header className={styles.siteHeader}>
         <div className={styles.monogram}>A</div>

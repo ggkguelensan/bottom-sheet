@@ -24,6 +24,12 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     ],
   }),
   component: RootComponent,
+  notFoundComponent: () => (
+    <main>
+      <h1>Запись не найдена</h1>
+      <p>В полевом атласе нет такой координаты.</p>
+    </main>
+  ),
 });
 
 function RootComponent() {

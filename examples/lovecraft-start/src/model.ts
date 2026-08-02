@@ -20,6 +20,7 @@ export type DemoDirection = "forward" | "backward" | "none" | "snap";
 
 type DemoCommon = Readonly<{
   revision: number;
+  mobile: boolean;
   presentation: DemoPresentation;
   preferredPresentation: DemoPresentation;
   direction: DemoDirection;
@@ -109,6 +110,7 @@ const initialState: DemoState = {
   kind: "closed",
   uiContext: {},
   revision: 0,
+  mobile: false,
   presentation: "sheet",
   preferredPresentation: "dialog",
   direction: "none",
@@ -122,6 +124,7 @@ const nextCommon = (
   patch: Partial<Omit<DemoCommon, "revision">> = {},
 ): DemoCommon => ({
   revision: state.revision + 1,
+  mobile: patch.mobile ?? state.mobile,
   presentation: patch.presentation ?? state.presentation,
   preferredPresentation:
     patch.preferredPresentation ?? state.preferredPresentation,
@@ -343,7 +346,7 @@ export function createLovecraftDemoModel(loader: ArchiveLoader) {
     source: $state,
     fn: (state, locationId): DemoState => {
       const presentation =
-        locationId === "arkham" || locationId === "dunwich"
+        !state.mobile && (locationId === "arkham" || locationId === "dunwich")
           ? state.preferredPresentation
           : "sheet";
       const common = nextCommon(state, {
@@ -576,7 +579,7 @@ export function createLovecraftDemoModel(loader: ArchiveLoader) {
     fn: (state, presentation): DemoState => ({
       ...state,
       ...nextCommon(state, {
-        presentation,
+        presentation: state.mobile ? "sheet" : presentation,
         preferredPresentation: presentation,
         direction: "none",
         cause: "presentation",
@@ -590,6 +593,7 @@ export function createLovecraftDemoModel(loader: ArchiveLoader) {
     fn: (state, resolution): DemoState => ({
       ...state,
       ...nextCommon(state, {
+        mobile: resolution.mobile,
         presentation: resolution.mobile ? "sheet" : state.preferredPresentation,
         direction: "none",
         cause: "presentation",

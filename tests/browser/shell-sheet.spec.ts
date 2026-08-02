@@ -150,7 +150,7 @@ test("Arkham uses one animated, non-draggable Popup and rejects stale async comp
   await expect(arkham).toHaveAttribute("data-demo-kind", "arkham.c.success", { timeout: 3_000 });
 });
 
-test("Innsmouth and Dreamlands accept one gesture release and keep Footer pinned", async ({ page }) => {
+test("Innsmouth and Dreamlands accept one gesture release and keep Footer pinned", async ({ page, browserName, isMobile }) => {
   await page.locator("[data-location='innsmouth']").getByRole("button", { name: "Осмотреть причал" }).click();
   const innsmouth = await waitForOpen(page, "innsmouth");
   await waitForAnimations(innsmouth);
@@ -171,8 +171,14 @@ test("Innsmouth and Dreamlands accept one gesture release and keep Footer pinned
   expect(scrollMetrics.scrollHeight).toBeGreaterThan(scrollMetrics.clientHeight);
   const bodyBox = await scrollBody.boundingBox();
   if (!bodyBox) throw new Error("Innsmouth Body has no visual box.");
-  await page.mouse.move(bodyBox.x + bodyBox.width / 2, bodyBox.y + bodyBox.height / 2);
-  await page.mouse.wheel(0, 260);
+  if (browserName === "webkit" && isMobile) {
+    // Playwright does not expose a wheel/touch-move primitive for mobile
+    // WebKit; scroll the same native overflow viewport through its DOM API.
+    await scrollBody.evaluate((element) => element.scrollBy({ top: 260 }));
+  } else {
+    await page.mouse.move(bodyBox.x + bodyBox.width / 2, bodyBox.y + bodyBox.height / 2);
+    await page.mouse.wheel(0, 260);
+  }
   await expect.poll(() => scrollBody.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   const afterScrollPopup = await innsmouth.boundingBox();
   expect(Math.abs(afterScrollPopup!.height - afterPopup!.height)).toBeLessThan(1);
@@ -327,6 +333,26 @@ test("pointer cancellation reconciles mechanics and viewport resize retargets th
     }
     element.releasePointerCapture(pointerId);
   }, lostPointer);
+  const lostBox = await handle.boundingBox();
+  if (!lostBox) throw new Error("Shell Sheet Handle disappeared during capture release.");
+  await page.mouse.move(
+    lostBox.x + lostBox.width / 2 + 1,
+    lostBox.y + lostBox.height / 2 - 49,
+  );
+  await page.waitForTimeout(50);
+  if (await surface.getAttribute("data-swiping") !== null) {
+    // Firefox/WebKit keep explicit release as a pending pointer-capture
+    // override under automation. Dispatch the specified lifecycle event with
+    // the real active pointer id to exercise the same cancellation path.
+    await handle.evaluate((element, pointerId) => {
+      element.dispatchEvent(new PointerEvent("lostpointercapture", {
+        bubbles: true,
+        pointerId,
+        pointerType: "mouse",
+        isPrimary: true,
+      }));
+    }, lostPointer);
+  }
   await expect(surface).not.toHaveAttribute("data-swiping", "");
   await page.mouse.up();
   await expect(page.getByRole("button", { name: "Expand sheet" })).toBeVisible();

@@ -337,11 +337,13 @@ export function createShellSheetController<
       activeTransition = next;
 
       const target = snapshot.authoritativeTarget;
-      const phase = !target.open
-        ? "closing"
-        : snapshot.settledTarget === null
-          ? "opening"
-          : "transitioning";
+      const phase = activeInteraction
+        ? "dragging"
+        : !target.open
+          ? "closing"
+          : snapshot.settledTarget === null
+            ? "opening"
+            : "transitioning";
       replaceSnapshot({ transitionId, phase });
 
       if (previous) {
@@ -376,8 +378,8 @@ export function createShellSheetController<
       replaceSnapshot({
         settledTarget,
         transitionId: null,
-        phase: target.open ? "open" : "closed",
       });
+      replaceSnapshot({ phase: stablePhase() });
       publishFact({
         type: "transition-settled",
         targetId: transition.targetId,

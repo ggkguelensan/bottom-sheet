@@ -240,6 +240,23 @@ describe("createShellSheetController", () => {
     expect(controller.getSnapshot().phase).toBe("opening");
   });
 
+  it("keeps interaction phase authoritative when a transition settles underneath it", () => {
+    const controller = createShellSheetController<Snap, Region>(openTarget("A"));
+    const transitionId = controller.beginTransition("A");
+    const interactionId = controller.beginInteraction("handle");
+
+    controller.settleTransition(transitionId);
+    expect(controller.getSnapshot()).toMatchObject({
+      phase: "dragging",
+      interaction: { interactionId },
+      settledTarget: { targetId: "A" },
+      transitionId: null,
+    });
+
+    controller.cancelInteraction(interactionId, "pointer-cancelled");
+    expect(controller.getSnapshot().phase).toBe("open");
+  });
+
   it("destroys idempotently and releases retained target graphs", () => {
     const controller = createShellSheetController<Snap, Region>(openTarget("A"));
     const events: string[] = [];

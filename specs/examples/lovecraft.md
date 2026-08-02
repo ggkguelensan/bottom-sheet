@@ -142,32 +142,61 @@ state. One release request travels from DOM through the controller to Effector
 and back through `controller.sync()`. Pointer moves do not travel through
 Effector. The API ref is a command/event port, not a second store.
 
-## 7. CSS token contract
+## 7. Lovecraft CSS token contract
 
 The React adapter is unstyled and follows the Base UI-shaped public hooks in
 [`../styling.md`](../styling.md). The example assigns its own CSS Module classes
 and PostCSS output to parts; those class names belong to the demo and are not
 library API.
 
-The example supplies all visual decisions through theme variables such as
-`--surface`, `--ink`, `--accent`, `--line`, `--panel-duration` and easing
-tokens. Mechanic selectors use public `data-open`, `data-starting-style`,
+Lovecraft styling uses one directed token graph and an explicit cascade order:
+
+```text
+primitive tokens → semantic tokens → component tokens → component rules
+```
+
+The global order is
+`reset, tokens, base, components, utilities, overrides`; `tokens` contains the
+ordered `primitive`, `semantic` and `component` sublayers.
+
+- Primitive `--atlas-primitive-*` tokens contain raw palette, typeface,
+  radius, shadow, duration and easing values. They do not name UI roles.
+- Semantic `--atlas-color-*`, `--atlas-font-*`, `--atlas-duration-*` and
+  `--atlas-easing-*` tokens express canvas, text, accent, border and motion
+  roles. They reference primitives only.
+- Component `--atlas-sheet-*` tokens express the Lovecraft rendering of Shell
+  Sheet. Public `--shell-sheet-*` mechanic inputs map from semantic motion
+  tokens here; the engine-owned `--drawer-*` outputs are never repurposed as
+  theme inputs.
+- `app.module.css` consumes semantic/component tokens and does not own raw
+  theme declarations. Consumers can replace the stylesheet without changing
+  the controller.
+
+The theme is a scoped CSS Module class rather than an accidental `:root`
+global. It MUST be attached to both the application scene and
+`ShellSheet.Portal`, because the portal is mounted under `body` and does not
+inherit variables from the scene subtree. Popup, Header, Body and Footer use
+the opaque `--atlas-sheet-background` component token and an opaque literal
+fallback. Missing theme scope must never silently produce transparent reading
+surfaces.
+
+Mechanic selectors use public `data-open`, `data-starting-style`,
 `data-ending-style`, `data-swiping` and `--drawer-*` values. Shell-specific
 region transitions use only the documented `data-region/data-layer` and
-`--shell-sheet-*` extensions. Consumers can replace the entire stylesheet
-without changing the controller.
+`--shell-sheet-*` extensions.
 
-## 8. Prototype variants
+## 8. Canonical composition
 
-The example includes three intentionally different scene compositions behind
-the standard prototype picker:
+The demo has one canonical visual composition: the editorial field atlas with
+an asymmetric evidence-card grid. It is a product-like conformance scene, not
+a visual-variant picker.
 
-- **Field notes** — editorial archive and asymmetric evidence grid;
-- **Cartographic** — dense coordinate map with spatially positioned nodes;
-- **Nocturne** — image-first horizontal exploration rail.
-
-The picker is harness chrome, not part of the product component. Number keys,
-arrow keys, URL `?v=`, and replay follow the prototype-skill contract.
+There is no Field notes/Cartographic/Nocturne switcher, replay control,
+number/arrow-key variant navigation, `data-variant` branch or URL `?v=` state.
+New Shell Sheet capabilities are demonstrated as domain scenarios inside this
+single composition. Deliberate redesigns replace the canonical composition in
+the specification and implementation instead of remaining as parallel product
+variants.
 
 ## 9. Acceptance criteria
 
@@ -187,5 +216,8 @@ arrow keys, URL `?v=`, and replay follow the prototype-skill contract.
 - The Antarctic image touches the visual top of the surface.
 - Desktop presentation can morph the same Popup between bottom sheet and
   centered dialog while open, without remount or text scale.
+- The demo renders one canonical composition with no visual-variant harness.
+- The scoped Lovecraft theme resolves inside the Portal; Popup, Header, Body and
+  Footer have an opaque computed background in browser conformance tests.
 - Modal semantics, non-modal pointer access, Escape, focus restoration,
   reduced-motion and gesture behavior stay covered by automated tests.

@@ -9,7 +9,7 @@ const moduleUrl = pathToFileURL(
   resolve(import.meta.dirname, "../examples/lovecraft-start/dist/server/server.js"),
 ).href;
 const serverModule = await import(moduleUrl) as Readonly<{ default: StartServer }>;
-const request = (): Request => new Request("http://shell-sheet.test/?v=field-notes");
+const request = (): Request => new Request("http://shell-sheet.test/");
 const [first, second] = await Promise.all([
   serverModule.default.fetch(request()),
   serverModule.default.fetch(request()),

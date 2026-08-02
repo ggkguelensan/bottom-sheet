@@ -100,9 +100,40 @@ const beginCapturedHandleDrag = async (
 };
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/?v=field-notes");
+  await page.goto("/");
   await expect(page.locator("[data-hydrated]")).toBeVisible();
   await expect(page.locator("[data-demo-state='closed']")).toBeVisible();
+  await expect(page.locator("[aria-label='Prototype variants']")).toHaveCount(0);
+});
+
+test("the canonical theme reaches the Portal and keeps every reading region opaque", async ({ page }) => {
+  await page.locator("[data-location='arkham']").getByRole("button", { name: /Открыть краткую запись/ }).click();
+  const surface = await waitForOpen(page, "location.info");
+  await waitForAnimations(surface);
+
+  const themeContract = await page.locator("[data-shell-sheet-portal]").evaluate((portal) => {
+    const activeRegionHost = (region: "header" | "body" | "footer"): HTMLElement => {
+      const layer = portal.querySelector<HTMLElement>(`[data-region='${region}'][data-active]`);
+      if (!(layer?.parentElement instanceof HTMLElement)) {
+        throw new Error(`Active ${region} region host is missing.`);
+      }
+      return layer.parentElement;
+    };
+    const panel = portal.querySelector<HTMLElement>("[data-demo-kind]");
+    if (!panel) throw new Error("The themed Shell Sheet Popup is missing.");
+    return {
+      sheetToken: getComputedStyle(portal).getPropertyValue("--atlas-sheet-background").trim(),
+      backgrounds: [
+        getComputedStyle(panel).backgroundColor,
+        getComputedStyle(activeRegionHost("header")).backgroundColor,
+        getComputedStyle(activeRegionHost("body")).backgroundColor,
+        getComputedStyle(activeRegionHost("footer")).backgroundColor,
+      ],
+    };
+  });
+
+  expect(themeContract.sheetToken).not.toBe("");
+  expect(themeContract.backgrounds).toEqual(Array.from({ length: 4 }, () => "rgb(17, 27, 27)"));
 });
 
 test("Arkham uses one animated, non-draggable Popup and rejects stale async completion", async ({ page, isMobile }) => {
@@ -247,12 +278,17 @@ test("the same Popup morphs sheet to dialog, applies modality, restores focus, a
 
   const close = page.getByRole("button", { name: "Закрыть", exact: true });
   const enter = page.getByRole("button", { name: "Войти в библиотеку", exact: true });
+  const scrollRegion = body(page);
+  await page.keyboard.press("Tab");
+  await expect(scrollRegion).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(close).toBeFocused();
   await page.keyboard.press("Shift+Tab");
+  await expect(scrollRegion).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
   await expect(enter).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(close).toBeFocused();
+  await expect(scrollRegion).toBeFocused();
 
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-shell-sheet-portal]")).toBeVisible();
@@ -269,6 +305,7 @@ test("reduced motion removes spatial entrance and modal accessibility has no ser
   await expect.poll(() => activeKeyframes(surface).then((frames) => frames.length)).toBeGreaterThan(0);
   const spatial = (await activeKeyframes(surface)).filter((frame) => frame.transform !== undefined);
   expect(spatial).toHaveLength(0);
+  await waitForAnimations(surface);
   await page.addScriptTag({ content: axe.source });
   const violations = await page.evaluate(async () => {
     const axeApi = (window as typeof window & {

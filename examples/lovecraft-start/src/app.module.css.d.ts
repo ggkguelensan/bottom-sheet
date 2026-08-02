@@ -26,10 +26,6 @@ declare const styles: Readonly<{
   longReport: string;
   mediaHeading: string;
   monogram: string;
-  picker: string;
-  pickerDivider: string;
-  pickerItem: string;
-  pickerReplay: string;
   popup: string;
   portal: string;
   presentationControl: string;

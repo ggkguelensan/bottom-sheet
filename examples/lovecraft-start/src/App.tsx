@@ -11,24 +11,7 @@ import {
 } from "./locations.js";
 import { useLovecraftRuntime } from "./runtime-context.js";
 import styles from "./app.module.css";
-
-export type PrototypeVariant = "field-notes" | "cartographic" | "nocturne";
-
-export const prototypeVariants: readonly Readonly<{
-  id: PrototypeVariant;
-  label: string;
-}>[] = [
-  { id: "field-notes", label: "Field notes" },
-  { id: "cartographic", label: "Cartographic" },
-  { id: "nocturne", label: "Nocturne" },
-];
-
-type AppProps = Readonly<{
-  variant: PrototypeVariant;
-  replay: number;
-  onVariantChange(variant: PrototypeVariant): void;
-  onReplay(): void;
-}>;
+import theme from "./theme.module.css";
 
 function Arrow({ direction = "right" }: Readonly<{ direction?: "left" | "right" }>) {
   return (
@@ -79,36 +62,6 @@ function LocationCard({
         {location.entranceLabel}
       </Button>
     </article>
-  );
-}
-
-function PrototypePicker({
-  value,
-  onChange,
-  onReplay,
-}: Readonly<{
-  value: PrototypeVariant;
-  onChange(value: PrototypeVariant): void;
-  onReplay(): void;
-}>) {
-  return (
-    <nav className={styles.picker} aria-label="Prototype variants">
-      {prototypeVariants.map((variant) => (
-        <Button
-          key={variant.id}
-          className={styles.pickerItem}
-          data-active={value === variant.id ? "" : undefined}
-          aria-current={value === variant.id ? "page" : undefined}
-          onClick={() => onChange(variant.id)}
-        >
-          {variant.label}
-        </Button>
-      ))}
-      <span className={styles.pickerDivider} aria-hidden="true" />
-      <Button className={styles.pickerReplay} aria-label="Повторить вступление (R)" onClick={onReplay}>
-        ↻
-      </Button>
-    </nav>
   );
 }
 
@@ -426,7 +379,7 @@ function ShellSingleton({ state }: Readonly<{ state: DemoState }>) {
       closeOnBackdrop
       closeOnEscape
     >
-      <ShellSheet.Portal keepMounted className={styles.portal}>
+      <ShellSheet.Portal keepMounted className={`${styles.portal} ${theme.theme}`}>
         <ShellSheet.Backdrop className={styles.backdrop} />
         <ShellSheet.Viewport className={styles.viewport}>
           <ShellSheet.Popup className={styles.popup} data-demo-kind={state.kind}>
@@ -444,7 +397,7 @@ function ShellSingleton({ state }: Readonly<{ state: DemoState }>) {
                   <StateHeader state={state} />
                 )}
               </ShellSheet.Header>
-              <ShellSheet.Body className={styles.sheetBody}>
+              <ShellSheet.Body className={styles.sheetBody} tabIndex={0}>
                 <StateBody state={state} />
               </ShellSheet.Body>
               <ShellSheet.Footer className={styles.sheetFooter}>
@@ -466,7 +419,7 @@ function ShellSingleton({ state }: Readonly<{ state: DemoState }>) {
   );
 }
 
-export function App({ variant, replay, onVariantChange, onReplay }: AppProps) {
+export function App() {
   const runtime = useLovecraftRuntime();
   const { state, select, enter, presentation, responsive } = useUnit({
     state: runtime.model.$state,
@@ -491,13 +444,10 @@ export function App({ variant, replay, onVariantChange, onReplay }: AppProps) {
 
   return (
     <div
-      className={styles.app}
-      data-variant={variant}
-      data-replay={replay}
+      className={`${styles.app} ${theme.theme}`}
       data-demo-state={state.kind}
       data-hydrated={hydrated ? "" : undefined}
     >
-      <PrototypePicker value={variant} onChange={onVariantChange} onReplay={onReplay} />
       <header className={styles.siteHeader}>
         <div className={styles.monogram}>A</div>
         <div><span>Мискатоникский архив</span><strong>Полевой атлас</strong></div>

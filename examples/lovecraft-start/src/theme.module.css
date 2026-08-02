@@ -1,0 +1,79 @@
+@layer tokens.primitive {
+  .theme {
+    --atlas-primitive-color-night-950: #07100f;
+    --atlas-primitive-color-night-900: #090f0f;
+    --atlas-primitive-color-night-850: #0a1212;
+    --atlas-primitive-color-night-800: #101717;
+    --atlas-primitive-color-surface-700: #111b1b;
+    --atlas-primitive-color-surface-650: #172222;
+    --atlas-primitive-color-surface-600: #26302f;
+    --atlas-primitive-color-ivory-50: #f1f0e7;
+    --atlas-primitive-color-fog-400: #91a09d;
+    --atlas-primitive-color-phosphor-300: #a9dccb;
+    --atlas-primitive-color-line-subtle: rgb(169 220 203 / 18%);
+    --atlas-primitive-color-line-strong: rgb(241 240 231 / 24%);
+    --atlas-primitive-font-display: Iowan Old Style, Palatino Linotype,
+      Book Antiqua, Georgia, serif;
+    --atlas-primitive-radius-sheet: 30px;
+    --atlas-primitive-shadow-sheet: 0 28px 90px rgb(0 0 0 / 54%);
+    --atlas-primitive-duration-enter: 280ms;
+    --atlas-primitive-duration-exit: 230ms;
+    --atlas-primitive-duration-morph: 280ms;
+    --atlas-primitive-duration-region: 220ms;
+    --atlas-primitive-ease-enter: cubic-bezier(0.32, 0.72, 0, 1);
+    --atlas-primitive-ease-change: cubic-bezier(0.65, 0, 0.35, 1);
+  }
+}
+
+@layer tokens.semantic {
+  .theme {
+    --atlas-color-canvas: var(--atlas-primitive-color-night-950);
+    --atlas-color-surface: var(--atlas-primitive-color-surface-700);
+    --atlas-color-surface-raised: var(--atlas-primitive-color-surface-650);
+    --atlas-color-control: var(--atlas-primitive-color-surface-600);
+    --atlas-color-text: var(--atlas-primitive-color-ivory-50);
+    --atlas-color-text-muted: var(--atlas-primitive-color-fog-400);
+    --atlas-color-accent: var(--atlas-primitive-color-phosphor-300);
+    --atlas-color-border-subtle: var(--atlas-primitive-color-line-subtle);
+    --atlas-color-border-strong: var(--atlas-primitive-color-line-strong);
+    --atlas-font-display: var(--atlas-primitive-font-display);
+    --atlas-duration-overlay-enter: var(--atlas-primitive-duration-enter);
+    --atlas-duration-overlay-exit: var(--atlas-primitive-duration-exit);
+    --atlas-duration-layout-morph: var(--atlas-primitive-duration-morph);
+    --atlas-duration-content-transition: var(--atlas-primitive-duration-region);
+    --atlas-easing-enter: var(--atlas-primitive-ease-enter);
+    --atlas-easing-change: var(--atlas-primitive-ease-change);
+  }
+}
+
+@layer tokens.component {
+  .theme {
+    --atlas-sheet-background: var(--atlas-color-surface);
+    --atlas-sheet-region-background: var(--atlas-sheet-background);
+    --atlas-sheet-foreground: var(--atlas-color-text);
+    --atlas-sheet-border: var(--atlas-color-border-subtle);
+    --atlas-sheet-radius: var(--atlas-primitive-radius-sheet);
+    --atlas-sheet-shadow: var(--atlas-primitive-shadow-sheet);
+    --atlas-sheet-backdrop: rgb(1 5 5 / 62%);
+    --atlas-sheet-handle: #53605e;
+    --atlas-sheet-action-background: var(--atlas-color-text);
+    --atlas-sheet-action-foreground: #101818;
+    --shell-sheet-open-duration: var(--atlas-duration-overlay-enter);
+    --shell-sheet-close-duration: var(--atlas-duration-overlay-exit);
+    --shell-sheet-geometry-duration: var(--atlas-duration-layout-morph);
+    --shell-sheet-region-duration: var(--atlas-duration-content-transition);
+    --shell-sheet-easing-enter: var(--atlas-easing-enter);
+    --shell-sheet-easing-change: var(--atlas-easing-change);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @layer tokens.component {
+    .theme {
+      --shell-sheet-open-duration: 120ms;
+      --shell-sheet-close-duration: 100ms;
+      --shell-sheet-geometry-duration: 100ms;
+      --shell-sheet-region-duration: 100ms;
+    }
+  }
+}

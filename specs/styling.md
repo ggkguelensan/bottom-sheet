@@ -55,6 +55,24 @@ scroll-viewport ownership, если ожидает v1 layout guarantees.
 стабильным public API v1. Public hooks — props, part state, attributes и CSS
 variables из этого документа.
 
+### Portal theme boundary
+
+CSS custom properties inherit through the DOM tree, not through the React tree.
+When `Portal` mounts under `body`, a theme class placed only on an application
+subtree cannot reach Popup or its regions. Consumer recipes MUST therefore use
+one of two explicit strategies:
+
+- place the theme scope on a common DOM ancestor such as the root document; or
+- pass the same scoped theme class to the application root and
+  `ShellSheet.Portal`.
+
+`Portal.className` and `Portal.style` are public styling inputs for this
+purpose. Shell Sheet stays unstyled and MUST NOT invent a surface color when a
+consumer omits its theme. Product demos that require readable opaque surfaces
+MUST add an opaque component-token fallback and browser-test the computed
+Popup/Header/Body/Footer backgrounds. This is a consumer styling invariant,
+not core or DOM state.
+
 ## 3. Общий React styling API
 
 Каждый part, который рендерит DOM element, использует Base UI-shaped types:

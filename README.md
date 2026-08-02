@@ -11,6 +11,7 @@ Changes follow `spec → tests → implementation → demo evidence`.
 
 - [Architecture and transition protocol](./specs/architecture.md)
 - [Repository structure and dependency boundaries](./specs/repository-structure.md)
+- [Base UI-shaped styling contract](./specs/styling.md)
 - [Module specifications](./specs/modules)
 - [Lovecraft conformance demo](./specs/examples/lovecraft.md)
 - [Quality and release gates](./specs/quality.md)

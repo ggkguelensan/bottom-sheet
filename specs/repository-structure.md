@@ -14,6 +14,7 @@ shell-sheet/
 │   ├── README.md
 │   ├── architecture.md
 │   ├── repository-structure.md
+│   ├── styling.md
 │   ├── quality.md
 │   ├── modules/
 │   │   ├── core.md

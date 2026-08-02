@@ -17,9 +17,11 @@ gesture, measurement, animation lifecycle и business state не дублиру�
     <ShellSheet.Backdrop />
     <ShellSheet.Viewport>
       <ShellSheet.Popup>
-        <ShellSheet.Header />
-        <ShellSheet.Body />
-        <ShellSheet.Footer />
+        <ShellSheet.Content>
+          <ShellSheet.Header />
+          <ShellSheet.Body />
+          <ShellSheet.Footer />
+        </ShellSheet.Content>
       </ShellSheet.Popup>
     </ShellSheet.Viewport>
   </ShellSheet.Portal>
@@ -29,6 +31,9 @@ gesture, measurement, animation lifecycle и business state не дублиру�
 Дополнительные parts: `Handle`, `DragArea`, `Title`, `Description`, `Close`.
 Common anatomy и prop naming SHOULD быть совместимы с Base UI Drawer там, где
 семантика совпадает. Shell-specific extensions не маскируются под Base API.
+
+Common default elements, state callbacks, attributes и CSS variables MUST
+соответствовать [`../styling.md`](../styling.md).
 
 ## 3. Root contract
 
@@ -58,8 +63,12 @@ protocol. Нельзя одновременно передавать controlled 
 - поддерживает `render` element/function composition;
 - принимает function `className/style` от public part state;
 - объединяет internal и consumer event handlers без потери accessibility;
-- публикует stable `data-*` attributes;
+- публикует exact Base-compatible `data-*` attributes для общей семантики;
 - не импортирует theme CSS.
+
+Public styling contract не зависит от internal `.shell-sheet-*` classes.
+`Content` является Base-compatible container, внутри которого Shell-specific
+Header/Body/Footer образуют layout regions.
 
 `Portal` принимает `container` и `keepMounted`. Singleton Portal/Popup не
 remount между open cycles при `keepMounted`.

@@ -136,11 +136,18 @@ from DOM to controller events, through Effector, and back through
 
 ## 7. CSS token contract
 
-The adapter emits stable `shell-sheet-*` classes and data attributes but imports no
-theme. The example supplies all visual decisions through CSS variables such as
-`--surface`, `--ink`, `--accent`, `--line`, `--panel-duration` and the easing
-tokens. Consumers can replace those values or provide an entirely different
-stylesheet without changing the controller.
+The React adapter is unstyled and follows the Base UI-shaped public hooks in
+[`../styling.md`](../styling.md). The example assigns its own CSS Module/plain
+CSS classes to parts; those class names belong to the demo and are not library
+API.
+
+The example supplies all visual decisions through theme variables such as
+`--surface`, `--ink`, `--accent`, `--line`, `--panel-duration` and easing
+tokens. Mechanic selectors use public `data-open`, `data-starting-style`,
+`data-ending-style`, `data-swiping` and `--drawer-*` values. Shell-specific
+region transitions use only the documented `data-region/data-layer` and
+`--shell-sheet-*` extensions. Consumers can replace the entire stylesheet
+without changing the controller.
 
 ## 8. Prototype variants
 

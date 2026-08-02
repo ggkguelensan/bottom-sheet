@@ -600,26 +600,28 @@ API следует общей анатомии Base UI Drawer, но runtime-за
 
     <ShellSheet.Viewport>
       <ShellSheet.Popup>
-        <ShellSheet.Header
-          transitionKey={view.regions.header.key}
-          behavior={view.regions.header.behavior}
-        >
-          {header}
-        </ShellSheet.Header>
+        <ShellSheet.Content>
+          <ShellSheet.Header
+            transitionKey={view.regions.header.key}
+            behavior={view.regions.header.behavior}
+          >
+            {header}
+          </ShellSheet.Header>
 
-        <ShellSheet.Body
-          transitionKey={view.regions.body.key}
-          behavior={view.regions.body.behavior}
-        >
-          {body}
-        </ShellSheet.Body>
+          <ShellSheet.Body
+            transitionKey={view.regions.body.key}
+            behavior={view.regions.body.behavior}
+          >
+            {body}
+          </ShellSheet.Body>
 
-        <ShellSheet.Footer
-          transitionKey={view.regions.footer.key}
-          behavior={view.regions.footer.behavior}
-        >
-          {footer}
-        </ShellSheet.Footer>
+          <ShellSheet.Footer
+            transitionKey={view.regions.footer.key}
+            behavior={view.regions.footer.behavior}
+          >
+            {footer}
+          </ShellSheet.Footer>
+        </ShellSheet.Content>
       </ShellSheet.Popup>
     </ShellSheet.Viewport>
   </ShellSheet.Portal>
@@ -631,6 +633,8 @@ API следует общей анатомии Base UI Drawer, но runtime-за
 - `Root` не создаёт DOM и владеет context/coordinator.
 - `Portal keepMounted` сохраняет singleton DOM между открытиями.
 - `Popup` является единственной анимируемой поверхностью.
+- `Content` сохраняет Base UI Drawer container semantics и содержит три
+  Shell-specific layout regions.
 - `Header`, `Body`, `Footer` регистрируют current/incoming measurements.
 - Default Handle остаётся вне transition-layer Header, чтобы не дублироваться
   при изменении только header content.
@@ -752,13 +756,17 @@ native и Motion animation drivers.
 
 ### 9.4. Публичный headless styling contract
 
-- Семантика не зависит от stylesheet библиотеки.
-- Stable part names, refs, `data-state`, `data-transition-status`,
-  `data-swiping`, `data-presentation` и CSS variables являются публичным API.
-- Pointer geometry обновляется напрямую на Popup, а не через наследуемую CSS
-  variable на всём subtree.
-- Интерактивные descendants могут отключить drag через стабильный
-  `data-shell-sheet-drag-ignore`.
+Полный normative contract находится в [`styling.md`](./styling.md).
+
+- React primitives unstyled и не импортируют theme CSS.
+- Common parts повторяют Base UI Drawer signatures для
+  `render/className/style`, common state, `data-*` и `--drawer-*` variables.
+- `data-starting-style`/`data-ending-style` используются и для open/close, и
+  для incoming/outgoing region layers.
+- Shell-specific Header/Body/Footer hooks используют отдельный
+  `--shell-sheet-*` namespace и не меняют смысл Base-compatible hooks.
+- `data-base-ui-swipe-ignore` поддерживается наряду с Shell-specific alias.
+- Internal `.shell-sheet-*` classes не являются обязательным public API.
 - Dev mode предупреждает о неизвестном snap point, дублирующихся region keys,
   отсутствующем Title и конфликтующем controlled/uncontrolled API.
 

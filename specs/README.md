@@ -20,6 +20,7 @@ gap, а не повод молча переписать spec под сущест
 | --- | --- |
 | [`architecture.md`](./architecture.md) | Цель продукта, state ownership, transition protocol, layout, gestures, accessibility и Definition of Done |
 | [`repository-structure.md`](./repository-structure.md) | Структура monorepo, dependency graph, exports и границы каталогов |
+| [`styling.md`](./styling.md) | Base UI Drawer-shaped styling API, states, attributes и CSS variables |
 | [`modules/core.md`](./modules/core.md) | Framework-agnostic state/controller и snap algorithms |
 | [`modules/dom.md`](./modules/dom.md) | DOM binding, measurements, coordinator, gestures, viewport и accessibility |
 | [`modules/motion.md`](./modules/motion.md) | `motion/mini` animation driver |
@@ -81,6 +82,7 @@ intent
 | Motion driver | Partial | Cancel result ещё не нормализован в общий lifecycle |
 | Effector adapter | Partial | Текущий convenience binding создаёт собственный `$state`; нужен adapter к производному `$shellTarget` приложения |
 | React adapter | Prototype | Монолитный API вместо целевого compound API; transition существует только для одного content region |
+| Styling compatibility | Specified | Base UI-shaped contract зафиксирован; implementation и conformance tests ещё не выполнены |
 | Lovecraft demo | Prototype | Нет полного async stale-result showcase и всех conformance states |
 | Quality gates | Partial | Есть unit/type/build checks; нужны contract, accessibility, SSR и browser interaction tests |
 

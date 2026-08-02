@@ -108,21 +108,20 @@ focus, inert и scroll styles идемпотентно.
 
 ## 9. Public DOM state
 
-Binding поддерживает stable attributes/CSS contract:
+Binding реализует exact attributes и variables из
+[`../styling.md`](../styling.md). Для общей drawer-семантики используются Base
+UI names (`data-open`, `data-starting-style`, `--drawer-height`,
+`--drawer-swipe-movement-y`), а не альтернативные Shell Sheet synonyms.
 
-- `data-state`;
-- `data-transition-status`;
-- `data-swiping`;
-- `data-presentation`;
-- `data-modality`;
-- `--shell-sheet-height` только как публичное settled/target значение.
-
-Per-frame drag transform записывается напрямую в Popup style, чтобы не
-пересчитывать inherited CSS variables во всём subtree.
+Inline mechanic styles и public CSS variables обновляются одной visual
+transaction, чтобы function state, selectors и фактическая geometry не
+расходились по frames. Shell-specific measurement variables не дублируют
+Base-compatible values.
 
 ## 10. Tests
 
 Tests MUST покрывать measurements трёх regions, content-size open, animated
 close, changed/unchanged regions, drag/scroll arbitration, pointer cancel,
 rejected proposal return, ResizeObserver retarget, focus/inert restoration,
-Escape reasons, reduced motion и idempotent destroy.
+Escape reasons, reduced motion, Base-compatible styling hooks и idempotent
+destroy.

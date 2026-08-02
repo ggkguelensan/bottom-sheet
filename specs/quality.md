@@ -29,6 +29,8 @@ npm run build:lovecraft
 - DOM binding с fake environment;
 - Effector global/forked scope;
 - React compound parts и SSR.
+- Base UI-shaped default tags, function styling props, state, data attributes
+  и CSS variables.
 
 ### Browser interaction
 
@@ -67,12 +69,15 @@ settle.
 ## 5. Performance и bundle
 
 - Pointer move не вызывает React render или Effector event на каждом frame.
-- Per-frame transform обновляется непосредственно на Popup.
+- Per-frame gesture mechanics обновляют только Popup/Backdrop public mechanics
+  styles and variables; React render и Effector event на каждом frame
+  запрещены.
 - Layout animation изолирована Popup containment.
 - ResizeObserver work коалесцируется.
 - `@shell-sheet/core` не имеет runtime dependencies.
 - Motion driver target budget: 3 kB minified+gzip.
 - React adapter не импортирует `motion/react`.
+- React adapter не импортирует bundled/default CSS.
 
 Bundle budgets MUST измеряться CI-инструментом на tree-shaken consumer fixture.
 README не публикует неподтверждённые размеры.
@@ -99,3 +104,5 @@ Package может считаться v1-ready только когда:
 4. Lovecraft demo показывает связанные visual/business сценарии.
 5. Нет domain strings в publishable packages.
 6. Package tarball и declarations проверены consumer fixture.
+7. Base UI Drawer styling conformance fixture проходит без зависимости от
+   internal `.shell-sheet-*` classes.

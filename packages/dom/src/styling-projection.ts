@@ -194,6 +194,7 @@ const projectRegion = <TSnap extends string, TRegionKey extends string>(
   const transitioning = [...(layers?.values() ?? [])].some(
     (layer) => layer.key !== targetKey,
   );
+  let focusWasInInactiveLayer = false;
   registry.elements[region]?.toggleAttribute(
     "data-transitioning",
     transitioning,
@@ -212,8 +213,17 @@ const projectRegion = <TSnap extends string, TRegionKey extends string>(
       layer.element.removeAttribute("aria-hidden");
       layer.element.inert = false;
     } else {
+      if (layer.element.contains(layer.element.ownerDocument.activeElement)) {
+        focusWasInInactiveLayer = true;
+      }
       layer.element.setAttribute("aria-hidden", "true");
       layer.element.inert = true;
     }
+  }
+
+  if (focusWasInInactiveLayer && registry.elements.popup) {
+    const popup = registry.elements.popup;
+    if (!popup.hasAttribute("tabindex")) popup.tabIndex = -1;
+    popup.focus({ preventScroll: true });
   }
 };

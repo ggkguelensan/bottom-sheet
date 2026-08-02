@@ -358,6 +358,9 @@ describe("target DOM binding", () => {
 
     const incoming = element("div", 500);
     Object.defineProperty(incoming, "scrollHeight", { value: 500 });
+    const outgoingAction = document.createElement("button");
+    anatomy.bodyLayer.append(outgoingAction);
+    outgoingAction.focus();
     anatomy.body.append(incoming);
     binding.registerRegionLayer(
       "body",
@@ -373,6 +376,7 @@ describe("target DOM binding", () => {
     expect(animatedElements).toContain(incoming);
     expect(animatedElements).not.toContain(anatomy.headerLayer);
     expect(animatedElements).not.toContain(anatomy.footerLayer);
+    expect(document.activeElement).toBe(anatomy.popup);
     expect(controller.getSnapshot().settledTarget?.targetId).toBe("B");
 
     binding.destroy();

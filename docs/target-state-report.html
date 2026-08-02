@@ -1,0 +1,2431 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      name="description"
+      content="Ненормативный визуальный отчёт о целевом состоянии Shell Sheet v1."
+    >
+    <title>Shell Sheet — target state v1</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #f0ede5;
+        --muted: #a9aa9f;
+        --dim: #73766e;
+        --paper: #171a17;
+        --paper-raised: #1d211d;
+        --paper-soft: #232822;
+        --line: rgba(240, 237, 229, 0.13);
+        --line-strong: rgba(240, 237, 229, 0.25);
+        --acid: #d6ff72;
+        --acid-soft: rgba(214, 255, 114, 0.12);
+        --coral: #ff786a;
+        --coral-soft: rgba(255, 120, 106, 0.12);
+        --sky: #7bdff2;
+        --sky-soft: rgba(123, 223, 242, 0.11);
+        --violet: #c9adff;
+        --violet-soft: rgba(201, 173, 255, 0.11);
+        --radius-sm: 10px;
+        --radius-md: 18px;
+        --radius-lg: 28px;
+        --max-width: 1220px;
+        --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+        --ease-change: cubic-bezier(0.65, 0, 0.35, 1);
+        font-family:
+          Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        font-synthesis: none;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 88px;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        background:
+          radial-gradient(circle at 78% 2%, rgba(123, 223, 242, 0.07), transparent 26rem),
+          radial-gradient(circle at 15% 24%, rgba(214, 255, 114, 0.05), transparent 32rem),
+          #111410;
+        color: var(--ink);
+        line-height: 1.55;
+        text-rendering: optimizeLegibility;
+      }
+
+      a {
+        color: inherit;
+        text-decoration-color: var(--dim);
+        text-underline-offset: 0.22em;
+      }
+
+      a:hover {
+        text-decoration-color: var(--acid);
+      }
+
+      button,
+      a {
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      button:focus-visible,
+      a:focus-visible,
+      summary:focus-visible {
+        outline: 2px solid var(--acid);
+        outline-offset: 4px;
+      }
+
+      .skip-link {
+        position: fixed;
+        z-index: 100;
+        top: 12px;
+        left: 12px;
+        padding: 9px 12px;
+        border-radius: var(--radius-sm);
+        background: var(--acid);
+        color: #11140f;
+        transform: translateY(-160%);
+        transition: transform 160ms var(--ease-out);
+      }
+
+      .skip-link:focus {
+        transform: translateY(0);
+      }
+
+      .progress {
+        position: fixed;
+        z-index: 80;
+        inset: 0 0 auto;
+        height: 2px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .progress__value {
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: var(--acid);
+        transform: scaleX(0);
+        transform-origin: left;
+        will-change: transform;
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 248px minmax(0, 1fr);
+        width: min(calc(100% - 40px), var(--max-width));
+        margin: 0 auto;
+      }
+
+      .rail {
+        position: sticky;
+        top: 0;
+        align-self: start;
+        height: 100vh;
+        padding: 32px 28px 28px 0;
+        border-right: 1px solid var(--line);
+      }
+
+      .rail__brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        margin-bottom: 44px;
+        text-decoration: none;
+      }
+
+      .rail__mark {
+        position: relative;
+        width: 28px;
+        height: 28px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+      }
+
+      .rail__mark::before,
+      .rail__mark::after {
+        position: absolute;
+        left: 5px;
+        width: 16px;
+        border: 1px solid var(--ink);
+        border-radius: 4px;
+        content: "";
+      }
+
+      .rail__mark::before {
+        top: 6px;
+        height: 5px;
+      }
+
+      .rail__mark::after {
+        bottom: 5px;
+        height: 9px;
+        border-color: var(--acid);
+      }
+
+      .rail__brand-copy {
+        display: grid;
+        line-height: 1.15;
+      }
+
+      .rail__brand-copy strong {
+        font-size: 0.86rem;
+        letter-spacing: 0.01em;
+      }
+
+      .rail__brand-copy span {
+        margin-top: 4px;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.66rem;
+      }
+
+      .rail nav {
+        display: grid;
+        gap: 3px;
+      }
+
+      .rail nav a {
+        display: grid;
+        grid-template-columns: 23px 1fr;
+        align-items: center;
+        min-height: 35px;
+        padding: 6px 9px;
+        border-radius: 8px;
+        color: var(--muted);
+        font-size: 0.78rem;
+        text-decoration: none;
+        transition:
+          color 150ms ease,
+          background 150ms ease;
+      }
+
+      .rail nav a::before {
+        color: var(--dim);
+        content: attr(data-index);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.63rem;
+      }
+
+      .rail nav a[aria-current="true"] {
+        background: var(--acid-soft);
+        color: var(--ink);
+      }
+
+      .rail nav a[aria-current="true"]::before {
+        color: var(--acid);
+      }
+
+      .rail__meta {
+        position: absolute;
+        right: 28px;
+        bottom: 28px;
+        left: 0;
+        padding-top: 16px;
+        border-top: 1px solid var(--line);
+        color: var(--dim);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.64rem;
+        line-height: 1.75;
+      }
+
+      main {
+        min-width: 0;
+        padding: 0 0 104px 52px;
+      }
+
+      section {
+        position: relative;
+        padding-top: 96px;
+      }
+
+      .hero {
+        min-height: 760px;
+        padding-top: 52px;
+      }
+
+      .eyebrow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        margin: 0 0 22px;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.68rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        width: 23px;
+        height: 1px;
+        background: currentColor;
+        content: "";
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 8px;
+        border: 1px solid rgba(214, 255, 114, 0.22);
+        border-radius: 999px;
+        background: var(--acid-soft);
+        color: var(--acid);
+        letter-spacing: 0.03em;
+        text-transform: none;
+      }
+
+      .status-pill::before {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: currentColor;
+        box-shadow: 0 0 10px currentColor;
+        content: "";
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        max-width: 840px;
+        margin-bottom: 24px;
+        font-size: clamp(3.15rem, 7.1vw, 6.75rem);
+        font-weight: 560;
+        letter-spacing: -0.072em;
+        line-height: 0.91;
+      }
+
+      h1 em {
+        color: var(--acid);
+        font-family: ui-serif, Georgia, serif;
+        font-weight: 400;
+      }
+
+      .hero__lead {
+        max-width: 690px;
+        margin-bottom: 42px;
+        color: #c9c9c0;
+        font-size: clamp(1.08rem, 1.6vw, 1.38rem);
+        line-height: 1.55;
+      }
+
+      .hero__meta {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1px;
+        overflow: hidden;
+        margin: 0;
+        padding: 0;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--line);
+        list-style: none;
+      }
+
+      .metric {
+        min-height: 125px;
+        padding: 21px;
+        background: var(--paper);
+      }
+
+      .metric strong {
+        display: block;
+        margin-bottom: 18px;
+        color: var(--acid);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 1.9rem;
+        font-weight: 500;
+        line-height: 1;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 0.73rem;
+        line-height: 1.45;
+      }
+
+      .notice {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        margin-top: 18px;
+        padding: 14px 16px;
+        border: 1px solid rgba(255, 120, 106, 0.22);
+        border-radius: var(--radius-sm);
+        background: var(--coral-soft);
+        color: #d6c3bf;
+        font-size: 0.76rem;
+      }
+
+      .notice::before {
+        color: var(--coral);
+        content: "!";
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .section-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+        gap: 42px;
+        align-items: end;
+        margin-bottom: 42px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .section-number {
+        display: block;
+        margin-bottom: 15px;
+        color: var(--acid);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.67rem;
+        letter-spacing: 0.12em;
+      }
+
+      h2 {
+        margin-bottom: 0;
+        font-size: clamp(2.1rem, 4.7vw, 4rem);
+        font-weight: 520;
+        letter-spacing: -0.055em;
+        line-height: 1;
+      }
+
+      .section-head p {
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      h3 {
+        margin-bottom: 11px;
+        font-size: 1.02rem;
+        font-weight: 570;
+        letter-spacing: -0.02em;
+      }
+
+      code,
+      pre,
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      code {
+        color: var(--acid);
+        font-size: 0.89em;
+      }
+
+      .card-grid {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .card {
+        position: relative;
+        overflow: hidden;
+        padding: 23px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: rgba(23, 26, 23, 0.78);
+      }
+
+      .card p:last-child {
+        margin-bottom: 0;
+      }
+
+      .card--4 {
+        grid-column: span 4;
+      }
+
+      .card--5 {
+        grid-column: span 5;
+      }
+
+      .card--6 {
+        grid-column: span 6;
+      }
+
+      .card--7 {
+        grid-column: span 7;
+      }
+
+      .card--8 {
+        grid-column: span 8;
+      }
+
+      .card--12 {
+        grid-column: span 12;
+      }
+
+      .card__label {
+        display: block;
+        margin-bottom: 36px;
+        color: var(--dim);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.62rem;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+
+      .card__copy {
+        color: var(--muted);
+        font-size: 0.83rem;
+      }
+
+      .principle-card {
+        min-height: 220px;
+      }
+
+      .principle-card::after {
+        position: absolute;
+        right: -27px;
+        bottom: -45px;
+        color: rgba(240, 237, 229, 0.025);
+        content: attr(data-glyph);
+        font-family: ui-serif, Georgia, serif;
+        font-size: 10rem;
+        line-height: 1;
+      }
+
+      .principle-card strong {
+        display: block;
+        max-width: 280px;
+        margin-bottom: 12px;
+        font-size: 1.3rem;
+        font-weight: 520;
+        line-height: 1.25;
+      }
+
+      .tabs {
+        padding: 9px;
+      }
+
+      .tab-list {
+        display: inline-flex;
+        gap: 4px;
+        margin: 0 0 22px;
+        padding: 4px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.12);
+      }
+
+      .tab-button {
+        min-height: 35px;
+        padding: 7px 11px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.72rem;
+        transition:
+          color 150ms ease,
+          background 150ms ease,
+          transform 120ms var(--ease-out);
+      }
+
+      .tab-button:active {
+        transform: scale(0.97);
+      }
+
+      .tab-button[aria-selected="true"] {
+        background: var(--paper-soft);
+        color: var(--ink);
+      }
+
+      [role="tabpanel"][hidden] {
+        display: none;
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 25px;
+        align-items: center;
+        min-height: 236px;
+        padding: 24px;
+        border-radius: 12px;
+        background:
+          linear-gradient(rgba(240, 237, 229, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(240, 237, 229, 0.035) 1px, transparent 1px),
+          #141713;
+        background-size: 24px 24px;
+      }
+
+      .flow__node {
+        position: relative;
+        display: grid;
+        align-content: center;
+        min-height: 104px;
+        padding: 15px;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        background: rgba(29, 33, 29, 0.94);
+      }
+
+      .flow__node:not(:last-child)::after {
+        position: absolute;
+        top: 50%;
+        left: calc(100% + 6px);
+        width: 14px;
+        height: 1px;
+        background: var(--dim);
+        content: "";
+      }
+
+      .flow__node:not(:last-child)::before {
+        position: absolute;
+        z-index: 1;
+        top: calc(50% - 3px);
+        left: calc(100% + 17px);
+        width: 5px;
+        height: 5px;
+        border-top: 1px solid var(--dim);
+        border-right: 1px solid var(--dim);
+        content: "";
+        transform: rotate(45deg);
+      }
+
+      .flow__node strong {
+        margin-bottom: 5px;
+        font-size: 0.76rem;
+      }
+
+      .flow__node span {
+        color: var(--dim);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.59rem;
+        line-height: 1.45;
+      }
+
+      .flow__node--owner {
+        border-color: rgba(214, 255, 114, 0.42);
+        box-shadow: inset 0 0 0 1px rgba(214, 255, 114, 0.05);
+      }
+
+      .flow__node--visual {
+        border-color: rgba(123, 223, 242, 0.36);
+      }
+
+      .flow-note {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 10px;
+        margin: 16px 24px 14px;
+        color: var(--muted);
+        font-size: 0.72rem;
+      }
+
+      .flow-note b {
+        color: var(--coral);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-weight: 500;
+      }
+
+      .contract-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(290px, 0.72fr);
+        gap: 14px;
+      }
+
+      .code-block {
+        overflow: auto;
+        margin: 0;
+        padding: 24px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: #0e110e;
+        color: #c6c9c0;
+        font-size: 0.72rem;
+        line-height: 1.72;
+        tab-size: 2;
+      }
+
+      .code-block .type {
+        color: var(--sky);
+      }
+
+      .code-block .value {
+        color: var(--acid);
+      }
+
+      .code-block .comment {
+        color: #656a62;
+      }
+
+      .contract-points {
+        display: grid;
+        gap: 1px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--line);
+      }
+
+      .contract-point {
+        padding: 18px;
+        background: var(--paper);
+      }
+
+      .contract-point b {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--acid);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.7rem;
+        font-weight: 500;
+      }
+
+      .contract-point p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.72rem;
+      }
+
+      .timeline {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .timeline li {
+        position: relative;
+        min-height: 194px;
+        padding: 23px 18px 18px;
+        border: 1px solid var(--line);
+        border-right: 0;
+        background: var(--paper);
+      }
+
+      .timeline li:first-child {
+        border-radius: var(--radius-md) 0 0 var(--radius-md);
+      }
+
+      .timeline li:last-child {
+        border-right: 1px solid var(--line);
+        border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      }
+
+      .timeline li::after {
+        position: absolute;
+        z-index: 1;
+        top: 31px;
+        right: -5px;
+        width: 9px;
+        height: 9px;
+        border-top: 1px solid var(--line-strong);
+        border-right: 1px solid var(--line-strong);
+        background: var(--paper);
+        content: "";
+        transform: rotate(45deg);
+      }
+
+      .timeline li:last-child::after {
+        display: none;
+      }
+
+      .timeline__index {
+        display: block;
+        margin-bottom: 25px;
+        color: var(--acid);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.65rem;
+      }
+
+      .timeline strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 0.82rem;
+      }
+
+      .timeline p {
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: 0.69rem;
+        line-height: 1.5;
+      }
+
+      .region-table,
+      .gap-table {
+        width: 100%;
+        border-collapse: collapse;
+        border-spacing: 0;
+        font-size: 0.73rem;
+      }
+
+      .region-table th,
+      .region-table td,
+      .gap-table th,
+      .gap-table td {
+        padding: 14px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .region-table th,
+      .gap-table th {
+        color: var(--dim);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.59rem;
+        font-weight: 500;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+      }
+
+      .region-table td,
+      .gap-table td {
+        color: var(--muted);
+      }
+
+      .region-table td:first-child,
+      .gap-table td:first-child {
+        color: var(--ink);
+        font-weight: 540;
+      }
+
+      .keep {
+        color: var(--acid);
+      }
+
+      .change {
+        color: var(--violet);
+      }
+
+      .layout-stage {
+        display: grid;
+        grid-template-columns: 0.8fr 1.2fr;
+        gap: 38px;
+        align-items: center;
+        min-height: 520px;
+        padding: 28px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background:
+          radial-gradient(circle at 22% 25%, rgba(214, 255, 114, 0.08), transparent 17rem),
+          #141713;
+      }
+
+      .device {
+        position: relative;
+        width: min(100%, 310px);
+        aspect-ratio: 0.63;
+        margin: 0 auto;
+        overflow: hidden;
+        border: 1px solid var(--line-strong);
+        border-radius: 36px;
+        background:
+          linear-gradient(145deg, rgba(123, 223, 242, 0.07), transparent 55%),
+          #0d100e;
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
+      }
+
+      .device::before {
+        position: absolute;
+        z-index: 3;
+        top: 10px;
+        left: 50%;
+        width: 60px;
+        height: 17px;
+        border-radius: 999px;
+        background: #050605;
+        content: "";
+        transform: translateX(-50%);
+      }
+
+      .map-lines {
+        position: absolute;
+        inset: 0;
+        opacity: 0.36;
+        background:
+          linear-gradient(27deg, transparent 42%, rgba(123, 223, 242, 0.15) 42.4%, transparent 43%),
+          linear-gradient(151deg, transparent 61%, rgba(214, 255, 114, 0.12) 61.4%, transparent 62%),
+          radial-gradient(circle at 33% 27%, rgba(255, 255, 255, 0.3) 0 2px, transparent 3px),
+          radial-gradient(circle at 73% 44%, rgba(255, 255, 255, 0.24) 0 2px, transparent 3px);
+      }
+
+      .sheet-demo {
+        position: absolute;
+        right: 7px;
+        bottom: 7px;
+        left: 7px;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        height: 67%;
+        min-height: 0;
+        overflow: hidden;
+        border: 1px solid var(--line-strong);
+        border-radius: 25px 25px 29px 29px;
+        background: #20251f;
+        box-shadow: 0 -18px 46px rgba(0, 0, 0, 0.38);
+      }
+
+      .demo-region {
+        position: relative;
+        min-height: 0;
+        padding: 15px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .demo-region:last-child {
+        border-bottom: 0;
+      }
+
+      .demo-region span {
+        display: block;
+        margin-bottom: 10px;
+        color: var(--dim);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.54rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .demo-header {
+        padding-top: 23px;
+      }
+
+      .demo-header::before {
+        position: absolute;
+        top: 9px;
+        left: 50%;
+        width: 34px;
+        height: 3px;
+        border-radius: 99px;
+        background: var(--dim);
+        content: "";
+        transform: translateX(-50%);
+      }
+
+      .demo-body {
+        overflow: hidden;
+      }
+
+      .demo-lines {
+        display: grid;
+        gap: 7px;
+      }
+
+      .demo-lines i {
+        display: block;
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(240, 237, 229, 0.13);
+      }
+
+      .demo-lines i:nth-child(2) {
+        width: 78%;
+      }
+
+      .demo-lines i:nth-child(3) {
+        width: 58%;
+      }
+
+      .demo-footer b {
+        display: block;
+        height: 29px;
+        border-radius: 8px;
+        background: var(--acid);
+      }
+
+      .layout-rules {
+        display: grid;
+        gap: 15px;
+      }
+
+      .layout-rule {
+        display: grid;
+        grid-template-columns: 32px 1fr;
+        gap: 13px;
+        align-items: start;
+      }
+
+      .layout-rule__mark {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        color: var(--acid);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.65rem;
+      }
+
+      .layout-rule p {
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: 0.76rem;
+      }
+
+      .packages {
+        display: grid;
+        gap: 9px;
+      }
+
+      .package {
+        display: grid;
+        grid-template-columns: 180px 1fr minmax(110px, auto);
+        gap: 20px;
+        align-items: center;
+        min-height: 91px;
+        padding: 19px 20px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: var(--paper);
+      }
+
+      .package__name {
+        color: var(--acid);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.73rem;
+      }
+
+      .package p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.76rem;
+      }
+
+      .package__deps {
+        color: var(--dim);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.6rem;
+        text-align: right;
+      }
+
+      .boundary {
+        margin-top: 14px;
+        padding: 17px 20px;
+        border: 1px dashed rgba(255, 120, 106, 0.35);
+        border-radius: 13px;
+        color: #d5b9b5;
+        font-size: 0.77rem;
+      }
+
+      .api-tree {
+        display: grid;
+        grid-template-columns: minmax(300px, 0.75fr) minmax(0, 1.25fr);
+        gap: 14px;
+      }
+
+      .tree {
+        margin: 0;
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: #0e110e;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.7rem;
+        line-height: 1.9;
+        white-space: pre-wrap;
+      }
+
+      .tree b {
+        color: var(--acid);
+        font-weight: 500;
+      }
+
+      .api-notes {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .api-note {
+        min-height: 148px;
+        padding: 19px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: var(--paper);
+      }
+
+      .api-note p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.72rem;
+      }
+
+      .async-flow {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 10px;
+        align-items: center;
+        min-height: 170px;
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--paper);
+      }
+
+      .async-node {
+        display: grid;
+        min-height: 70px;
+        padding: 10px;
+        place-items: center;
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.61rem;
+        text-align: center;
+      }
+
+      .async-node--loading {
+        border-color: rgba(255, 120, 106, 0.42);
+        color: var(--coral);
+      }
+
+      .async-node--good {
+        border-color: rgba(214, 255, 114, 0.42);
+        color: var(--acid);
+      }
+
+      .async-arrow {
+        color: var(--dim);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.65rem;
+        text-align: center;
+      }
+
+      .guard-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      .guard {
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: rgba(23, 26, 23, 0.78);
+      }
+
+      .guard b {
+        display: block;
+        margin-bottom: 7px;
+        color: var(--sky);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.67rem;
+        font-weight: 500;
+      }
+
+      .guard p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.72rem;
+      }
+
+      .roadmap {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        counter-reset: roadmap;
+      }
+
+      .roadmap-step {
+        position: relative;
+        min-height: 220px;
+        padding: 20px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--paper);
+        counter-increment: roadmap;
+      }
+
+      .roadmap-step::before {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        margin-bottom: 40px;
+        place-items: center;
+        border-radius: 9px;
+        background: var(--acid-soft);
+        color: var(--acid);
+        content: counter(roadmap, decimal-leading-zero);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.62rem;
+      }
+
+      .roadmap-step p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.72rem;
+      }
+
+      .roadmap-step:nth-child(n + 5)::before {
+        background: var(--sky-soft);
+        color: var(--sky);
+      }
+
+      .gap-table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--paper);
+      }
+
+      .spaced-card,
+      .roadmap-gap {
+        margin-top: 14px;
+      }
+
+      .table-scroll {
+        overflow-x: auto;
+      }
+
+      .dod-wrap {
+        margin-top: 52px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 7px;
+        border-radius: 999px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.58rem;
+        white-space: nowrap;
+      }
+
+      .badge--partial {
+        background: var(--coral-soft);
+        color: var(--coral);
+      }
+
+      .badge--prototype {
+        background: var(--violet-soft);
+        color: var(--violet);
+      }
+
+      .badge--specified {
+        background: var(--acid-soft);
+        color: var(--acid);
+      }
+
+      .definition-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      details {
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: var(--paper);
+      }
+
+      summary {
+        position: relative;
+        padding: 17px 45px 17px 18px;
+        cursor: pointer;
+        font-size: 0.78rem;
+        font-weight: 550;
+        list-style: none;
+      }
+
+      summary::-webkit-details-marker {
+        display: none;
+      }
+
+      summary::after {
+        position: absolute;
+        top: 50%;
+        right: 18px;
+        color: var(--acid);
+        content: "+";
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        transform: translateY(-50%);
+      }
+
+      details[open] summary::after {
+        content: "−";
+      }
+
+      details ul {
+        margin: 0;
+        padding: 0 25px 20px 36px;
+        color: var(--muted);
+        font-size: 0.72rem;
+      }
+
+      details li + li {
+        margin-top: 8px;
+      }
+
+      .sources {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .source {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        min-height: 68px;
+        padding: 15px 17px;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        background: var(--paper);
+        text-decoration: none;
+        transition:
+          border-color 150ms ease,
+          background 150ms ease,
+          transform 120ms var(--ease-out);
+      }
+
+      .source:hover {
+        border-color: var(--line-strong);
+        background: var(--paper-raised);
+      }
+
+      .source:active {
+        transform: scale(0.985);
+      }
+
+      .source strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 0.76rem;
+      }
+
+      .source span {
+        color: var(--dim);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.58rem;
+      }
+
+      .source::after {
+        align-self: center;
+        color: var(--acid);
+        content: "↗";
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .footer-note {
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 1px solid var(--line);
+        color: var(--dim);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.62rem;
+        line-height: 1.8;
+      }
+
+      @media (hover: hover) and (pointer: fine) {
+        .rail nav a:hover {
+          background: rgba(240, 237, 229, 0.04);
+          color: var(--ink);
+        }
+
+        .card {
+          transition:
+            border-color 180ms ease,
+            background 180ms ease;
+        }
+
+        .principle-card:hover {
+          border-color: var(--line-strong);
+          background: var(--paper-raised);
+        }
+      }
+
+      @media (max-width: 980px) {
+        .shell {
+          grid-template-columns: 1fr;
+          width: min(calc(100% - 32px), 820px);
+        }
+
+        .rail {
+          position: relative;
+          z-index: 10;
+          display: flex;
+          height: auto;
+          align-items: center;
+          justify-content: space-between;
+          padding: 22px 0;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .rail__brand {
+          margin: 0;
+        }
+
+        .rail nav,
+        .rail__meta {
+          display: none;
+        }
+
+        main {
+          padding-left: 0;
+        }
+
+        .hero {
+          min-height: auto;
+          padding-top: 70px;
+        }
+
+        .flow {
+          grid-template-columns: 1fr;
+        }
+
+        .flow__node:not(:last-child)::after {
+          top: calc(100% + 5px);
+          left: 50%;
+          width: 1px;
+          height: 15px;
+        }
+
+        .flow__node:not(:last-child)::before {
+          top: calc(100% + 16px);
+          left: calc(50% - 3px);
+          transform: rotate(135deg);
+        }
+
+        .contract-layout,
+        .api-tree {
+          grid-template-columns: 1fr;
+        }
+
+        .timeline {
+          grid-template-columns: 1fr;
+        }
+
+        .timeline li,
+        .timeline li:first-child,
+        .timeline li:last-child {
+          min-height: auto;
+          border: 1px solid var(--line);
+          border-bottom: 0;
+          border-radius: 0;
+        }
+
+        .timeline li:first-child {
+          border-radius: var(--radius-md) var(--radius-md) 0 0;
+        }
+
+        .timeline li:last-child {
+          border-bottom: 1px solid var(--line);
+          border-radius: 0 0 var(--radius-md) var(--radius-md);
+        }
+
+        .timeline li::after {
+          display: none;
+        }
+
+        .roadmap {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 720px) {
+        .shell {
+          width: min(calc(100% - 24px), 680px);
+        }
+
+        section {
+          padding-top: 76px;
+        }
+
+        .hero {
+          padding-top: 54px;
+        }
+
+        h1 {
+          font-size: clamp(3.05rem, 16vw, 4.8rem);
+        }
+
+        .hero__meta,
+        .section-head,
+        .layout-stage,
+        .sources,
+        .definition-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .section-head {
+          gap: 20px;
+        }
+
+        .card--4,
+        .card--5,
+        .card--6,
+        .card--7,
+        .card--8,
+        .card--12 {
+          grid-column: span 12;
+        }
+
+        .layout-stage {
+          padding: 20px;
+        }
+
+        .package {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+
+        .package__deps {
+          text-align: left;
+        }
+
+        .async-flow {
+          grid-template-columns: 1fr;
+        }
+
+        .async-arrow {
+          transform: rotate(90deg);
+        }
+
+        .guard-grid,
+        .api-notes,
+        .roadmap {
+          grid-template-columns: 1fr;
+        }
+
+        .roadmap-step {
+          min-height: auto;
+        }
+
+        .roadmap-step::before {
+          margin-bottom: 24px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+
+      @media print {
+        :root {
+          color-scheme: light;
+          --ink: #111410;
+          --muted: #454940;
+          --dim: #686d64;
+          --paper: #ffffff;
+          --paper-raised: #ffffff;
+          --paper-soft: #f2f3ee;
+          --line: rgba(17, 20, 16, 0.15);
+          --line-strong: rgba(17, 20, 16, 0.25);
+          --acid: #376300;
+          --acid-soft: rgba(55, 99, 0, 0.08);
+          --coral: #a22c23;
+          --coral-soft: rgba(162, 44, 35, 0.07);
+          --sky: #00677a;
+          --sky-soft: rgba(0, 103, 122, 0.08);
+          --violet: #6236a2;
+          --violet-soft: rgba(98, 54, 162, 0.08);
+        }
+
+        body {
+          background: #fff;
+          color: #111410;
+        }
+
+        .progress,
+        .rail {
+          display: none;
+        }
+
+        .shell {
+          display: block;
+          width: 100%;
+        }
+
+        main {
+          padding: 0;
+        }
+
+        section {
+          break-inside: avoid;
+        }
+
+        .hero {
+          min-height: auto;
+        }
+
+        .card,
+        .package,
+        .timeline li,
+        .gap-table-wrap,
+        details,
+        .source,
+        .code-block,
+        .tree,
+        .flow,
+        .layout-stage {
+          background: #fff;
+          box-shadow: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">К содержанию</a>
+    <div class="progress" aria-hidden="true">
+      <span class="progress__value"></span>
+    </div>
+
+    <div class="shell">
+      <aside class="rail" aria-label="Навигация по отчёту">
+        <a class="rail__brand" href="#overview" aria-label="Shell Sheet — к началу">
+          <span class="rail__mark" aria-hidden="true"></span>
+          <span class="rail__brand-copy">
+            <strong>Shell Sheet</strong>
+            <span>target state / v1</span>
+          </span>
+        </a>
+
+        <nav>
+          <a href="#overview" data-index="00" aria-current="true">Обзор</a>
+          <a href="#north-star" data-index="01">Принципы</a>
+          <a href="#loops" data-index="02">Два контура</a>
+          <a href="#target" data-index="03">Atomic target</a>
+          <a href="#transition" data-index="04">Transition</a>
+          <a href="#layout" data-index="05">Layout</a>
+          <a href="#packages" data-index="06">Пакеты</a>
+          <a href="#react-api" data-index="07">React API</a>
+          <a href="#async" data-index="08">Async flow</a>
+          <a href="#roadmap" data-index="09">Путь к v1</a>
+          <a href="#sources" data-index="10">Источники</a>
+        </nav>
+
+        <div class="rail__meta">
+          <div>snapshot: 2026-08-02</div>
+          <div>commit: 154f515</div>
+          <div>branch: origin/main</div>
+        </div>
+      </aside>
+
+      <main id="main">
+        <section class="hero" id="overview" aria-labelledby="overview-title">
+          <div class="eyebrow">
+            Architecture report
+            <span class="status-pill">Target v1 зафиксирован</span>
+          </div>
+          <h1 id="overview-title">Как будет устроен <em>Shell Sheet</em></h1>
+          <p class="hero__lead">
+            В целевом состоянии приложение принимает бизнес-решение, Core фиксирует
+            его identity и lifecycle, а один DOM coordinator превращает новый target
+            в непрерывное визуальное состояние — без второго source of truth.
+          </p>
+
+          <ul class="hero__meta">
+            <li class="metric">
+              <strong>01</strong>
+              <span>authoritative owner — приложение</span>
+            </li>
+            <li class="metric">
+              <strong>02</strong>
+              <span>runtime loop: semantic и hot visual</span>
+            </li>
+            <li class="metric">
+              <strong>03</strong>
+              <span>независимых региона: Header / Body / Footer</span>
+            </li>
+            <li class="metric">
+              <strong>05</strong>
+              <span>пакетов с жёсткими ownership-границами</span>
+            </li>
+          </ul>
+
+          <div class="notice">
+            <span>
+              Это ненормативный визуальный отчёт по состоянию
+              <strong>origin/main @ 154f515</strong>. При любом расхождении
+              единственным источником истины остаётся <code>specs/README.md</code>
+              и связанные спецификации.
+            </span>
+          </div>
+        </section>
+
+        <section id="north-star" aria-labelledby="north-star-title">
+          <header class="section-head">
+            <div>
+              <span class="section-number">01 / NORTH STAR</span>
+              <h2 id="north-star-title">Три несущих принципа</h2>
+            </div>
+            <p>
+              Target-архитектура строится вокруг ясного ownership: домен решает,
+              Core упорядочивает, DOM визуализирует.
+            </p>
+          </header>
+
+          <div class="card-grid">
+            <article class="card card--4 principle-card" data-glyph="T">
+              <span class="card__label">Authority</span>
+              <strong>Target приходит снаружи и целиком</strong>
+              <p class="card__copy">
+                Открытие, snap point, presentation, modality, draggable policy и
+                region keys меняются одной транзакцией приложения.
+              </p>
+            </article>
+            <article class="card card--4 principle-card" data-glyph="1">
+              <span class="card__label">Coordination</span>
+              <strong>Один visual coordinator</strong>
+              <p class="card__copy">
+                Геометрия Popup, Backdrop и изменившиеся регионы стартуют в одном
+                кадре и получают один tokenized terminal result.
+              </p>
+            </article>
+            <article class="card card--4 principle-card" data-glyph="↯">
+              <span class="card__label">Continuity</span>
+              <strong>Прерывание — штатный путь</strong>
+              <p class="card__copy">
+                Новый target начинает движение от текущей видимой геометрии. Late
+                completion старой анимации не может settle новый переход.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section id="loops" aria-labelledby="loops-title">
+          <header class="section-head">
+            <div>
+              <span class="section-number">02 / RUNTIME LOOPS</span>
+              <h2 id="loops-title">Два контура, одна граница</h2>
+            </div>
+            <p>
+              Низкочастотные смысловые события и покадровая pointer-геометрия не
+              смешиваются. Они встречаются только на release / target boundary.
+            </p>
+          </header>
+
+          <div class="card tabs">
+            <div class="tab-list" role="tablist" aria-label="Контуры выполнения">
+              <button
+                class="tab-button"
+                type="button"
+                role="tab"
+                id="tab-semantic"
+                aria-controls="panel-semantic"
+                aria-selected="true"
+              >
+                Semantic loop
+              </button>
+              <button
+                class="tab-button"
+                type="button"
+                role="tab"
+                id="tab-visual"
+                aria-controls="panel-visual"
+                aria-selected="false"
+                tabindex="-1"
+              >
+                Hot visual loop
+              </button>
+            </div>
+
+            <div role="tabpanel" id="panel-semantic" aria-labelledby="tab-semantic">
+              <div class="flow">
+                <div class="flow__node flow__node--owner">
+                  <strong>Application</strong>
+                  <span>$flow<br>business decision</span>
+                </div>
+                <div class="flow__node">
+                  <strong>$shellTarget</strong>
+                  <span>atomic projection<br>targetId</span>
+                </div>
+                <div class="flow__node">
+                  <strong>Core</strong>
+                  <span>sync · request · fact<br>transitionId</span>
+                </div>
+                <div class="flow__node flow__node--visual">
+                  <strong>DOM</strong>
+                  <span>measure · animate<br>settle</span>
+                </div>
+                <div class="flow__node">
+                  <strong>Observed fact</strong>
+                  <span>settled · replaced<br>cancelled</span>
+                </div>
+              </div>
+              <p class="flow-note">
+                <b>RETURN</b>
+                <span>
+                  Gesture/API публикуют request; только приложение может принять его
+                  и вернуть новый authoritative target.
+                </span>
+              </p>
+            </div>
+
+            <div
+              role="tabpanel"
+              id="panel-visual"
+              aria-labelledby="tab-visual"
+              hidden
+            >
+              <div class="flow">
+                <div class="flow__node flow__node--visual">
+                  <strong>PointerEvent</strong>
+                  <span>registered Handle<br>or DragArea</span>
+                </div>
+                <div class="flow__node flow__node--visual">
+                  <strong>Gesture session</strong>
+                  <span>capture · velocity<br>rubber band</span>
+                </div>
+                <div class="flow__node flow__node--visual">
+                  <strong>Coalesced rAF</strong>
+                  <span>DOM-local state<br>one frame</span>
+                </div>
+                <div class="flow__node flow__node--visual">
+                  <strong>Mechanic styles</strong>
+                  <span>Popup transform<br>Backdrop progress</span>
+                </div>
+                <div class="flow__node">
+                  <strong>One release</strong>
+                  <span>snap/close request<br>to Core</span>
+                </div>
+              </div>
+              <p class="flow-note">
+                <b>60 FPS</b>
+                <span>
+                  Pointer move не попадает в Core snapshot, Effector event или React
+                  render. Semantic publication происходит один раз на release.
+                </span>
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="target" aria-labelledby="target-title">
+          <header class="section-head">
+            <div>
+              <span class="section-number">03 / ATOMIC TARGET</span>
+              <h2 id="target-title">Один объект вместо набора флагов</h2>
+            </div>
+            <p>
+              Closed и open — разные ветки union. Open target включает весь визуальный
+              контракт, чтобы React не увидел новую страницу со старой геометрией.
+            </p>
+          </header>
+
+          <div class="contract-layout">
+            <pre class="code-block"><span class="comment">// Example open target: application-owned, deeply readonly</span>
+<span class="type">ShellSheetOpenTarget</span> = {
+  targetId: <span class="value">"flow:42:B.2"</span>,
+  open: <span class="value">true</span>,
+  snapPoints: [
+    { id: <span class="value">"b.compact"</span>, size: { type: <span class="value">"ratio"</span>, value: 0.48 } },
+    { id: <span class="value">"b.expanded"</span>, size: { type: <span class="value">"ratio"</span>, value: 0.86 } },
+  ],
+  snapPoint: <span class="value">"b.expanded"</span>,
+  presentation: <span class="value">"sheet"</span>,
+  modality: <span class="value">"non-modal"</span>,
+  draggable: <span class="value">true</span>,
+  contentResizeBehavior: <span class="value">"keep-snap-and-scroll"</span>,
+  regions: {
+    header: { key: <span class="value">"navigation"</span>, transition: <span class="value">"preserve"</span> },
+    body: { key: <span class="value">"location-details"</span>, transition: <span class="value">"crossfade"</span> },
+    footer: { key: <span class="value">"primary-actions"</span>, transition: <span class="value">"preserve"</span> },
+  },
+  transition: { cause: <span class="value">"snap"</span>, direction: <span class="value">"snap"</span>, motion: <span class="value">"auto"</span> },
+};</pre>
+
+            <div class="contract-points">
+              <div class="contract-point">
+                <b>targetId</b>
+                <p>Identity принятого доменного перехода. Создаётся приложением.</p>
+              </div>
+              <div class="contract-point">
+                <b>transitionId</b>
+                <p>Identity конкретной visual attempt. Создаётся Core.</p>
+              </div>
+              <div class="contract-point">
+                <b>settledTarget</b>
+                <p>Последний полностью показанный open target, а не второй store.</p>
+              </div>
+              <div class="contract-point">
+                <b>request → target → fact</b>
+                <p>Proposal, принятое состояние и наблюдаемый результат не смешиваются.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="transition" aria-labelledby="transition-title">
+          <header class="section-head">
+            <div>
+              <span class="section-number">04 / TRANSACTION</span>
+              <h2 id="transition-title">Одна transition transaction</h2>
+            </div>
+            <p>
+              Registry, measurements, geometry и region layers сходятся в одном
+              прерываемом coordinator. Никаких независимых таймеров в React-регионах.
+            </p>
+          </header>
+
+          <ol class="timeline">
+            <li>
+              <span class="timeline__index">01</span>
+              <strong>Schedule</strong>
+              <p>Target, registry и observer events коалесцируются до одного work item.</p>
+            </li>
+            <li>
+              <span class="timeline__index">02</span>
+              <strong>Measure</strong>
+              <p>Все DOM reads: current rect, incoming regions, viewport и natural height.</p>
+            </li>
+            <li>
+              <span class="timeline__index">03</span>
+              <strong>Mutate / prepare</strong>
+              <p>Target attributes, invert geometry и hidden incoming styles пишутся вместе.</p>
+            </li>
+            <li>
+              <span class="timeline__index">04</span>
+              <strong>Animate</strong>
+              <p>На следующем frame стартуют Popup, Backdrop и changed regions.</p>
+            </li>
+            <li>
+              <span class="timeline__index">05</span>
+              <strong>Settle</strong>
+              <p>Пинится stable target, outgoing layers удаляются, token получает terminal fact.</p>
+            </li>
+          </ol>
+
+          <div class="card card--12 spaced-card">
+            <span class="card__label">Independent region identity</span>
+            <div class="table-scroll">
+              <table class="region-table">
+                <thead>
+                  <tr>
+                    <th>Переход</th>
+                    <th>Header</th>
+                    <th>Body</th>
+                    <th>Footer</th>
+                    <th>Popup geometry</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>A → B.1</td>
+                    <td><span class="keep">preserve</span></td>
+                    <td><span class="change">crossfade + blur</span></td>
+                    <td><span class="keep">preserve</span></td>
+                    <td>к высоте B.1</td>
+                  </tr>
+                  <tr>
+                    <td>B.1 → B.2</td>
+                    <td><span class="keep">preserve</span></td>
+                    <td><span class="keep">same key</span></td>
+                    <td><span class="keep">preserve</span></td>
+                    <td>к expanded snap</td>
+                  </tr>
+                  <tr>
+                    <td>A → C</td>
+                    <td><span class="keep">preserve</span></td>
+                    <td><span class="change">crossfade + blur</span></td>
+                    <td><span class="change">crossfade + blur</span></td>
+                    <td>координатно вместе</td>
+                  </tr>
+                  <tr>
+                    <td>sheet → dialog</td>
+                    <td><span class="keep">same DOM</span></td>
+                    <td><span class="keep">same DOM</span></td>
+                    <td><span class="keep">same DOM</span></td>
+                    <td>measured morph, no scale</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="layout" aria-labelledby="layout-title">
+          <header class="section-head">
+            <div>
+              <span class="section-number">05 / LAYOUT &amp; MOTION</span>
+              <h2 id="layout-title">Один Popup, три региона</h2>
+            </div>
+            <p>
+              Header и Footer закреплены. Body — единственный scroll viewport. Sheet и
+              dialog — две геометрии одной поверхности, а не два компонента.
+            </p>
+          </header>
+
+          <div class="layout-stage">
+            <div class="device" role="img" aria-label="Схема Shell Sheet layout">
+              <div class="map-lines" aria-hidden="true"></div>
+              <div class="sheet-demo">
+                <div class="demo-region demo-header">
+                  <span>Header · pinned</span>
+                  <div class="demo-lines"><i></i><i></i></div>
+                </div>
+                <div class="demo-region demo-body">
+                  <span>Body · scroll viewport</span>
+                  <div class="demo-lines"><i></i><i></i><i></i><i></i><i></i></div>
+                </div>
+                <div class="demo-region demo-footer">
+                  <span>Footer · pinned</span>
+                  <b aria-hidden="true"></b>
+                </div>
+              </div>
+            </div>
+
+            <div class="layout-rules">
+              <div class="layout-rule">
+                <span class="layout-rule__mark">H</span>
+                <div>
+                  <h3>Natural target height</h3>
+                  <p>
+                    Header + intrinsic Body + Footer. Handle входит в Header и не
+                    прибавляется второй раз.
+                  </p>
+                </div>
+              </div>
+              <div class="layout-rule">
+                <span class="layout-rule__mark">↕</span>
+                <div>
+                  <h3>Contained height motion</h3>
+                  <p>
+                    Popup изолирует layout через <code>contain: layout paint</code>.
+                    Высота анимируется сознательно, чтобы сохранить реальный scroll layout.
+                  </p>
+                </div>
+              </div>
+              <div class="layout-rule">
+                <span class="layout-rule__mark">D</span>
+                <div>
+                  <h3>Sheet ↔ dialog</h3>
+                  <p>
+                    Coordinator измеряет old/new rect и анимирует translate + sizes. Scale
+                    запрещён: typography не искажается, Popup не remount.
+                  </p>
+                </div>
+              </div>
+              <div class="layout-rule">
+                <span class="layout-rule__mark">A</span>
+                <div>
+                  <h3>Accessibility follows visuals</h3>
+                  <p>
+                    Неактивный transition layer получает <code>inert</code> и
+                    <code>aria-hidden</code>; в дереве доступности остаётся один смысловой слой.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="packages" aria-labelledby="packages-title">
+          <header class="section-head">
+            <div>
+              <span class="section-number">06 / MODULE OWNERSHIP</span>
+              <h2 id="packages-title">Пять глубоких модулей</h2>
+            </div>
+            <p>
+              Каждый пакет владеет одним типом сложности. Верхние adapters используют
+              нижние seams и не копируют их алгоритмы.
+            </p>
+          </header>
+
+          <div class="packages">
+            <article class="package">
+              <span class="package__name">@shell-sheet/core</span>
+              <p>Atomic target, requests/facts, immutable snapshot, snap/release algorithms.</p>
+              <span class="package__deps">runtime deps: 0</span>
+            </article>
+            <article class="package">
+              <span class="package__name">@shell-sheet/dom</span>
+              <p>Registry, measurement transaction, coordinator, gestures, focus and modality.</p>
+              <span class="package__deps">→ core</span>
+            </article>
+            <article class="package">
+              <span class="package__name">@shell-sheet/motion</span>
+              <p>Только driver contract поверх <code>motion/mini</code>; без JSX и drag.</p>
+              <span class="package__deps">→ dom + motion/mini</span>
+            </article>
+            <article class="package">
+              <span class="package__name">@shell-sheet/effector</span>
+              <p>Attach application-owned <code>$target</code>, typed requests и visual facts.</p>
+              <span class="package__deps">→ core · Effector peer</span>
+            </article>
+            <article class="package">
+              <span class="package__name">@shell-sheet/react</span>
+              <p>Compound composition, Portal, refs и token-safe region registration.</p>
+              <span class="package__deps">→ core + dom · React peers</span>
+            </article>
+          </div>
+
+          <div class="boundary">
+            <strong>Запрещённая утечка:</strong> <code>kind</code>,
+            <code>uiContext</code>, route, Query cache, тексты и demo-сценарии остаются
+            в application/example. Core не знает о DOM; React не измеряет; Effector не
+            получает pointer frames.
+          </div>
+        </section>
+
+        <section id="react-api" aria-labelledby="react-api-title">
+          <header class="section-head">
+            <div>
+              <span class="section-number">07 / REACT COMPOSITION</span>
+              <h2 id="react-api-title">Compound API без visual logic</h2>
+            </div>
+            <p>
+              API повторяет Base UI Drawer-shaped anatomy и styling hooks, но расширяет
+              её независимыми регионами и atomic target mode.
+            </p>
+          </header>
+
+          <div class="api-tree">
+            <pre class="tree"><b>ShellSheet.Root</b>  target · onRequest · onFact
+├─ Trigger
+└─ Portal  keepMounted
+   ├─ Backdrop
+   └─ Viewport
+      └─ <b>Popup</b>  singleton surface
+         └─ Content
+            ├─ Header
+            │  └─ Handle
+            ├─ <b>Body</b>  only scroll viewport
+            └─ Footer
+
+Additional parts
+├─ DragArea
+├─ Title / Description
+└─ Close</pre>
+
+            <div class="api-notes">
+              <article class="api-note">
+                <h3>Три state mode</h3>
+                <p>
+                  Atomic target, external controller или Base-shaped convenience.
+                  Одновременное смешивание режимов запрещено типами.
+                </p>
+              </article>
+              <article class="api-note">
+                <h3>Root без DOM</h3>
+                <p>
+                  Root владеет context/composition. Binding создаётся после refs; все
+                  measurements и animation остаются в DOM adapter.
+                </p>
+              </article>
+              <article class="api-note">
+                <h3>Headless styling</h3>
+                <p>
+                  <code>render</code>, function <code>className/style</code>, stable
+                  <code>data-*</code> и <code>--drawer-*</code>; bundled CSS отсутствует.
+                </p>
+              </article>
+              <article class="api-note">
+                <h3>SSR-safe lifecycle</h3>
+                <p>
+                  Cached snapshots через <code>useSyncExternalStore</code>; Portal v1
+                  client-attached и становится видимым только после measurement.
+                </p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="async" aria-labelledby="async-title">
+          <header class="section-head">
+            <div>
+              <span class="section-number">08 / APPLICATION FLOW</span>
+              <h2 id="async-title">Async не протекает в библиотеку</h2>
+            </div>
+            <p>
+              Query владеет cache и transport, Effector — flow и operation identity.
+              Shell Sheet показывает уже выбранный target и не знает о загрузке.
+            </p>
+          </header>
+
+          <div class="async-flow" role="group" aria-label="Детерминированный async flow">
+            <div class="async-node">B.1 / B.2</div>
+            <div class="async-arrow">→</div>
+            <div class="async-node async-node--loading">C.loading<br>requestId</div>
+            <div class="async-arrow">→</div>
+            <div class="async-node async-node--good">C.1.success</div>
+            <div class="async-arrow">/</div>
+            <div class="async-node">C.1.fail<br>Retry</div>
+          </div>
+
+          <div class="guard-grid">
+            <article class="guard">
+              <b>BACK</b>
+              <p>Восстанавливает точный сохранённый B.1/B.2 из <code>returnTo</code>.</p>
+            </article>
+            <article class="guard">
+              <b>ABORT</b>
+              <p>Физическая отмена экономит ресурс, но не является гарантией корректности.</p>
+            </article>
+            <article class="guard">
+              <b>STATE GUARD</b>
+              <p>Late done/fail применяется только при совпадении current kind и requestId.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="roadmap" aria-labelledby="roadmap-title">
+          <header class="section-head">
+            <div>
+              <span class="section-number">09 / IMPLEMENTATION PATH</span>
+              <h2 id="roadmap-title">Bottom-up путь к v1</h2>
+            </div>
+            <p>
+              Целевые contracts уже specified, но реализация остаётся Partial/Prototype.
+              Двигаться нужно по dependency direction — от Core к demo evidence.
+            </p>
+          </header>
+
+          <div class="roadmap">
+            <article class="roadmap-step">
+              <h3>Public contracts</h3>
+              <p>Atomic target, snapshots, requests/facts, generics и compile-time fixtures.</p>
+            </article>
+            <article class="roadmap-step">
+              <h3>Pure algorithms</h3>
+              <p>Strict validation, snap resolution, projected release и rubber band.</p>
+            </article>
+            <article class="roadmap-step">
+              <h3>Core controller</h3>
+              <p>Cached snapshots, FIFO publication, tokenized lifecycle и destroy.</p>
+            </article>
+            <article class="roadmap-step">
+              <h3>DOM foundation</h3>
+              <p>Injected environment, stale-safe registry и measure/mutate scheduler.</p>
+            </article>
+            <article class="roadmap-step">
+              <h3>Visual coordinator</h3>
+              <p>Opening, closing, geometry, independent regions и interruption.</p>
+            </article>
+            <article class="roadmap-step">
+              <h3>Platform mechanics</h3>
+              <p>Gestures, focus, modality, VisualViewport и sheet↔dialog morph.</p>
+            </article>
+            <article class="roadmap-step">
+              <h3>Drivers &amp; adapters</h3>
+              <p>Native/Motion drivers, direct Effector binding и compound React API.</p>
+            </article>
+            <article class="roadmap-step">
+              <h3>Reference proof</h3>
+              <p>TanStack Start demo, browser/a11y/SSR и package release gates.</p>
+            </article>
+          </div>
+
+          <div class="gap-table-wrap roadmap-gap">
+            <table class="gap-table">
+              <thead>
+                <tr>
+                  <th>Область</th>
+                  <th>Сейчас</th>
+                  <th>Главный implementation gap</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Core</td>
+                  <td><span class="badge badge--partial">Partial</span></td>
+                  <td>Нет target union, immutable snapshots и tokenized lifecycle.</td>
+                </tr>
+                <tr>
+                  <td>DOM</td>
+                  <td><span class="badge badge--partial">Partial</span></td>
+                  <td>Нет transaction scheduler, region registry/coordinator и morph.</td>
+                </tr>
+                <tr>
+                  <td>Motion</td>
+                  <td><span class="badge badge--partial">Partial</span></td>
+                  <td>Cancellation ещё не нормализована в единый lifecycle.</td>
+                </tr>
+                <tr>
+                  <td>Effector</td>
+                  <td><span class="badge badge--partial">Partial</span></td>
+                  <td>Convenience binding пока создаёт собственный <code>$state</code>.</td>
+                </tr>
+                <tr>
+                  <td>React</td>
+                  <td><span class="badge badge--prototype">Prototype</span></td>
+                  <td>Монолитный API и transition только одного content region.</td>
+                </tr>
+                <tr>
+                  <td>Styling / Platform</td>
+                  <td><span class="badge badge--specified">Specified</span></td>
+                  <td>Нужны implementation, conformance, SSR и packed-package gates.</td>
+                </tr>
+                <tr>
+                  <td>Lovecraft demo</td>
+                  <td><span class="badge badge--prototype">Prototype</span></td>
+                  <td>Миграция на TanStack Start и полный async/visual showcase.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="dod-wrap">
+            <span class="card__label">Definition of Done · grouped</span>
+            <div class="definition-grid">
+              <details>
+                <summary>Lifecycle &amp; coordination</summary>
+                <ul>
+                  <li>Measured animated open и content-preserving close.</li>
+                  <li>A→B.1 geometry + Body crossfade одним transaction.</li>
+                  <li>Rapid replace/cancel — один terminal result на token.</li>
+                  <li>Unchanged regions не remount и не blur.</li>
+                </ul>
+              </details>
+              <details>
+                <summary>Interaction &amp; layout</summary>
+                <ul>
+                  <li>Pinned Header/Footer, only-Body scroll.</li>
+                  <li>Projected gesture release и rejected-proposal reconcile.</li>
+                  <li><code>draggable=false</code> полностью убирает Handle.</li>
+                  <li>Same-Popup sheet↔dialog без text scale.</li>
+                </ul>
+              </details>
+              <details>
+                <summary>Platform &amp; release</summary>
+                <ul>
+                  <li>SSR/hydration без browser globals и geometry flash.</li>
+                  <li>Modal focus, inert, scroll lock, Escape и restore.</li>
+                  <li>Chromium, Firefox, WebKit browser contracts.</li>
+                  <li>Tarball, declarations, bundling и accessibility gates.</li>
+                </ul>
+              </details>
+            </div>
+          </div>
+        </section>
+
+        <section id="sources" aria-labelledby="sources-title">
+          <header class="section-head">
+            <div>
+              <span class="section-number">10 / SOURCES</span>
+              <h2 id="sources-title">Нормативные источники</h2>
+            </div>
+            <p>
+              Отчёт сознательно не вводит новых требований. Детали и точные public
+              contracts следует читать в specs.
+            </p>
+          </header>
+
+          <div class="sources">
+            <a class="source" href="../specs/README.md">
+              <span><strong>Specs index</strong><span>status · decisions · gaps</span></span>
+            </a>
+            <a class="source" href="../specs/architecture.md">
+              <span><strong>Architecture</strong><span>state · lifecycle · DoD</span></span>
+            </a>
+            <a class="source" href="../specs/modules/core.md">
+              <span><strong>Core contract</strong><span>target · request · fact</span></span>
+            </a>
+            <a class="source" href="../specs/modules/dom.md">
+              <span><strong>DOM contract</strong><span>registry · coordinator · gesture</span></span>
+            </a>
+            <a class="source" href="../specs/modules/react.md">
+              <span><strong>React contract</strong><span>compound API · SSR</span></span>
+            </a>
+            <a class="source" href="../specs/modules/effector.md">
+              <span><strong>Effector contract</strong><span>application-owned target</span></span>
+            </a>
+            <a class="source" href="../specs/styling.md">
+              <span><strong>Styling contract</strong><span>Base-shaped public hooks</span></span>
+            </a>
+            <a class="source" href="../specs/platform.md">
+              <span><strong>Platform contract</strong><span>TypeScript · SSR · browser</span></span>
+            </a>
+            <a class="source" href="../specs/quality.md">
+              <span><strong>Quality gates</strong><span>tests · a11y · packages</span></span>
+            </a>
+            <a class="source" href="../specs/examples/lovecraft.md">
+              <span><strong>Lovecraft showcase</strong><span>reference conformance app</span></span>
+            </a>
+          </div>
+
+          <p class="footer-note">
+            Generated from repository specs · github.com/ggkguelensan/bottom-sheet ·
+            origin/main @ 154f515 · 2026-08-02 · no external runtime assets
+          </p>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const progress = document.querySelector(".progress__value");
+      const navLinks = Array.from(document.querySelectorAll(".rail nav a"));
+      const sections = navLinks
+        .map((link) => document.querySelector(link.getAttribute("href")))
+        .filter((section) => section instanceof HTMLElement);
+
+      const updateProgress = () => {
+        const available = document.documentElement.scrollHeight - window.innerHeight;
+        const ratio = available > 0 ? Math.min(1, Math.max(0, window.scrollY / available)) : 0;
+        if (progress instanceof HTMLElement) {
+          progress.style.transform = `scaleX(${ratio})`;
+        }
+      };
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const visible = entries
+            .filter((entry) => entry.isIntersecting)
+            .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+          if (!visible) return;
+
+          navLinks.forEach((link) => {
+            const current = link.getAttribute("href") === `#${visible.target.id}`;
+            if (current) link.setAttribute("aria-current", "true");
+            else link.removeAttribute("aria-current");
+          });
+        },
+        { rootMargin: "-20% 0px -64%", threshold: [0.01, 0.25, 0.5] },
+      );
+
+      sections.forEach((section) => observer.observe(section));
+      window.addEventListener("scroll", updateProgress, { passive: true });
+      updateProgress();
+
+      const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+      const selectTab = (nextTab) => {
+        tabs.forEach((tab) => {
+          const selected = tab === nextTab;
+          tab.setAttribute("aria-selected", String(selected));
+          tab.tabIndex = selected ? 0 : -1;
+          const panel = document.getElementById(tab.getAttribute("aria-controls"));
+          if (panel) panel.hidden = !selected;
+        });
+      };
+
+      tabs.forEach((tab, index) => {
+        tab.addEventListener("click", () => selectTab(tab));
+        tab.addEventListener("keydown", (event) => {
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+          event.preventDefault();
+          const direction = event.key === "ArrowRight" ? 1 : -1;
+          const next = tabs[(index + direction + tabs.length) % tabs.length];
+          selectTab(next);
+          next.focus();
+        });
+      });
+    </script>
+  </body>
+</html>

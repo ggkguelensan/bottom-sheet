@@ -15,6 +15,8 @@ spec → contract test → implementation → demo evidence → verification
 
 Start here:
 
+- [Visual target-state report](./docs/target-state-report.html) — a
+  self-contained, non-normative architecture overview
 - [Architecture and target state](./specs/architecture.md)
 - [Core contract](./specs/modules/core.md)
 - [DOM contract](./specs/modules/dom.md)

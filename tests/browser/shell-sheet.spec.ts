@@ -158,10 +158,25 @@ test("Innsmouth and Dreamlands accept one gesture release and keep Footer pinned
   await dragHandleUp(page);
   await expect(page.getByRole("button", { name: "Collapse sheet" })).toBeVisible();
   await expect(page.getByText(/Колокол на складе/)).toBeVisible();
+  await waitForAnimations(innsmouth);
   const afterPopup = await innsmouth.boundingBox();
   const afterFooter = await footer(page).boundingBox();
   expect(Math.abs((afterPopup!.y + afterPopup!.height) - (afterFooter!.y + afterFooter!.height))).toBeLessThan(2);
   expect(afterFooter!.height).toBe(beforeFooter!.height);
+  const scrollBody = body(page);
+  const scrollMetrics = await scrollBody.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(scrollMetrics.scrollHeight).toBeGreaterThan(scrollMetrics.clientHeight);
+  const bodyBox = await scrollBody.boundingBox();
+  if (!bodyBox) throw new Error("Innsmouth Body has no visual box.");
+  await page.mouse.move(bodyBox.x + bodyBox.width / 2, bodyBox.y + bodyBox.height / 2);
+  await page.mouse.wheel(0, 260);
+  await expect.poll(() => scrollBody.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  const afterScrollPopup = await innsmouth.boundingBox();
+  expect(Math.abs(afterScrollPopup!.height - afterPopup!.height)).toBeLessThan(1);
+  await expect(page.getByRole("button", { name: "Collapse sheet" })).toBeVisible();
 
   await page.getByRole("button", { name: "Закрыть" }).click();
   await expect(page.locator("[data-shell-sheet-portal]")).toBeHidden();
@@ -262,6 +277,27 @@ test("reduced motion removes spatial entrance and modal accessibility has no ser
   expect(labelledBy).toBeTruthy();
   if (labelledBy === null) throw new Error("The dialog has no accessible title reference.");
   await expect(page.locator(`#${labelledBy}`)).toHaveCount(1);
+});
+
+test("rapid close and reopen retargets the same Popup from its current visual state", async ({ page }) => {
+  await useSlowTiming(page);
+  const trigger = page.locator("[data-location='arkham']").getByRole("button", { name: /Открыть краткую запись/ });
+  await trigger.click();
+  const surface = await waitForOpen(page, "location.info");
+  await surface.evaluate((element) => { element.dataset.rapidIdentity = "preserved"; });
+
+  await page.getByRole("button", { name: "Закрыть", exact: true }).click();
+  await expect(surface).toHaveAttribute("data-ending-style", "");
+  await trigger.evaluate((element) => (element as HTMLButtonElement).click());
+
+  await expect(surface).toHaveAttribute("data-open", "");
+  await expect(surface).toHaveAttribute("data-rapid-identity", "preserved");
+  await waitForAnimations(surface);
+  await expect(page.locator("[data-shell-sheet-portal]")).toBeVisible();
+  await expect(surface).not.toHaveAttribute("data-ending-style", "");
+
+  await page.getByRole("button", { name: "Закрыть", exact: true }).click();
+  await expect(page.locator("[data-shell-sheet-portal]")).toBeHidden();
 });
 
 test("pointer cancellation reconciles mechanics and viewport resize retargets the open sheet", async ({ page }) => {

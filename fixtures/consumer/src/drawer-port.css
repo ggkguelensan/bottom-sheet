@@ -1,0 +1,43 @@
+.drawer-viewport {
+  --drawer-keyboard-inset: 0px;
+  position: fixed;
+  inset: 0;
+  display: grid;
+  align-items: end;
+  padding-block-end: var(--drawer-keyboard-inset);
+  pointer-events: none;
+}
+
+.drawer-popup {
+  width: min(100%, 42rem);
+  height: var(--drawer-height);
+  max-height: calc(100dvh - var(--drawer-keyboard-inset));
+  transform: translateY(var(--drawer-swipe-movement-y));
+  border-radius: 1.5rem 1.5rem 0 0;
+  background: Canvas;
+  color: CanvasText;
+  pointer-events: auto;
+}
+
+.drawer-popup[data-swiping] {
+  cursor: grabbing;
+}
+
+.drawer-popup[data-expanded] {
+  border-start-start-radius: 1rem;
+  border-start-end-radius: 1rem;
+}
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  opacity: var(--drawer-swipe-progress, 1);
+  background: rgb(0 0 0 / 45%);
+}
+
+/* Shell Sheet's animation driver owns transform/opacity/geometry timing. */
+.drawer-popup,
+.drawer-backdrop {
+  transition-property: background-color, color, border-color;
+  transition-duration: 160ms;
+}

@@ -8,7 +8,7 @@
     --line: rgb(169 220 203 / 18%);
     --strong-line: rgb(241 240 231 / 24%);
     --serif: Iowan Old Style, Palatino Linotype, Book Antiqua, Georgia, serif;
-    --shell-sheet-open-duration: 300ms;
+    --shell-sheet-open-duration: 280ms;
     --shell-sheet-close-duration: 230ms;
     --shell-sheet-geometry-duration: 280ms;
     --shell-sheet-region-duration: 220ms;
@@ -139,11 +139,12 @@
   .snapActions button { min-height: 40px; font-size: 12px; }
 
   @media (hover: hover) and (pointer: fine) {
-    .card, .cardEntrance, .primaryAction, .secondaryAction, .picker button { transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease; }
+    .card, .cardEntrance, .primaryAction, .secondaryAction, .picker button { transition: transform 120ms cubic-bezier(0.23, 1, 0.32, 1), border-color 160ms ease, background-color 160ms ease, color 160ms ease; }
     .card:hover { border-color: rgb(169 220 203 / 52%); }
     .cardEntrance:hover, .secondaryAction:hover { border-color: var(--accent); color: var(--ink); }
   }
-  button:active { transform: scale(.97); transition-duration: 120ms; }
+  button { transition: transform 120ms cubic-bezier(0.23, 1, 0.32, 1); }
+  button:active { transform: scale(.97); }
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
   @media (max-width: 720px) {

@@ -10,7 +10,6 @@ import {
   visualOpenTarget,
 } from "./measurement.js";
 import {
-  applyStructuralMechanics,
   projectStableState,
 } from "./styling-projection.js";
 import type {
@@ -331,8 +330,6 @@ export function createTransitionCoordinator<
     const visualTarget = visualOpenTarget(snapshot);
     const { portal, popup, backdrop } = registry.elements;
     if (!portal || !popup || !authoritative) return;
-
-    applyStructuralMechanics(registry);
 
     if (!authoritative.open && !snapshot.settledTarget) {
       projectStableState(snapshot, registry, null);

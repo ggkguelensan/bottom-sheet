@@ -53,7 +53,7 @@ describe("Motion mini driver", () => {
 
     expect(nativeAnimate).toHaveBeenCalledWith(
       [{ opacity: 0 }, { opacity: 1 }],
-      { duration: 180, easing: "ease-out" },
+      { duration: 180, easing: "ease-out", fill: "both" },
     );
     controls.stop();
     await expect(controls.finished).resolves.toEqual({ status: "cancelled" });

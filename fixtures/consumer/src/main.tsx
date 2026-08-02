@@ -9,6 +9,7 @@ import {
 import { createShellSheetBinding } from "@shell-sheet/effector";
 import { createMotionAnimationDriver } from "@shell-sheet/motion";
 import { ShellSheet } from "@shell-sheet/react";
+import "./drawer-port.css";
 
 type Snap = "content";
 type Region = "header" | "body" | "footer";
@@ -36,9 +37,9 @@ if (!host) throw new Error("Consumer fixture host is missing.");
 createRoot(host).render(
   <ShellSheet.Root controller={controller} animation={animation}>
     <ShellSheet.Portal keepMounted>
-      <ShellSheet.Backdrop />
-      <ShellSheet.Viewport>
-        <ShellSheet.Popup>
+      <ShellSheet.Backdrop className="drawer-backdrop" />
+      <ShellSheet.Viewport className="drawer-viewport">
+        <ShellSheet.Popup className="drawer-popup">
           <ShellSheet.Content>
             <ShellSheet.Header><ShellSheet.Title>Fixture</ShellSheet.Title></ShellSheet.Header>
             <ShellSheet.Body>Typed public exports</ShellSheet.Body>

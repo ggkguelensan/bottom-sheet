@@ -23,14 +23,13 @@ export function createMotionAnimationDriver(): ShellAnimationDriver {
   return {
     animate(element, keyframes, options) {
       let stopped = false;
-      const controls = Array.isArray(keyframes)
-        ? (() => {
-            const animation = element.animate(keyframes, {
-              duration: options.durationMs,
-              easing: options.easing,
-            });
-            return { finished: animation.finished, stop: () => animation.cancel() };
-          })()
+      const native = Array.isArray(keyframes);
+      const controls = native
+        ? element.animate(keyframes, {
+            duration: options.durationMs,
+            easing: options.easing,
+            fill: "both",
+          })
         : animate(element, keyframes as Parameters<typeof animate>[1], {
             duration: options.durationMs / 1_000,
             ease: toMotionEasing(options.easing),
@@ -45,7 +44,8 @@ export function createMotionAnimationDriver(): ShellAnimationDriver {
         stop() {
           if (stopped) return;
           stopped = true;
-          controls.stop();
+          if (native) (controls as Animation).cancel();
+          else (controls as ReturnType<typeof animate>).stop();
         },
       };
     },

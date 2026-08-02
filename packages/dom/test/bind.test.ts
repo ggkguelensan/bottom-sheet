@@ -379,6 +379,73 @@ describe("target DOM binding", () => {
     binding.destroy();
   });
 
+  it("finishes all layout reads before the first mechanic write in each frame", async () => {
+    const harness = createHarness();
+    const controller = createShellSheetController<Snap, Region>(closed());
+    const binding = bindShellSheetToDom(controller, {
+      environment: harness.environment,
+      animation: harness.animation,
+      scrollLock: { acquire: () => () => undefined },
+      backgroundIsolation: { acquire: () => () => undefined },
+    });
+    const anatomy = registerAnatomy(binding);
+    let frameWrote = false;
+    const violations: string[] = [];
+    const nodes = [
+      anatomy.portal,
+      anatomy.backdrop,
+      anatomy.viewport,
+      anatomy.popup,
+      anatomy.content,
+      anatomy.header,
+      anatomy.body,
+      anatomy.footer,
+      anatomy.handle,
+      anatomy.headerLayer,
+      anatomy.bodyLayer,
+      anatomy.footerLayer,
+    ];
+    for (const node of nodes) {
+      const readRect = node.getBoundingClientRect.bind(node);
+      node.getBoundingClientRect = () => {
+        if (frameWrote) violations.push(`layout read after write: ${node.tagName}`);
+        return readRect();
+      };
+      const setProperty = node.style.setProperty.bind(node.style);
+      node.style.setProperty = (...args) => {
+        frameWrote = true;
+        return setProperty(...args);
+      };
+      const setAttribute = node.setAttribute.bind(node);
+      node.setAttribute = (name, value) => {
+        frameWrote = true;
+        setAttribute(name, value);
+      };
+      const removeAttribute = node.removeAttribute.bind(node);
+      node.removeAttribute = (name) => {
+        frameWrote = true;
+        removeAttribute(name);
+      };
+      const toggleAttribute = node.toggleAttribute.bind(node);
+      node.toggleAttribute = (name, force) => {
+        frameWrote = true;
+        return force === undefined
+          ? toggleAttribute(name)
+          : toggleAttribute(name, force);
+      };
+    }
+
+    controller.sync(opened("read-before-write"));
+    for (let index = 0; index < 8; index += 1) {
+      frameWrote = false;
+      if (harness.frames.pending() > 0) harness.frames.flush();
+      await Promise.resolve();
+    }
+    expect(violations).toEqual([]);
+    expect(controller.getSnapshot().settledTarget?.targetId).toBe("read-before-write");
+    binding.destroy();
+  });
+
   it("falls back from invalid CSS timing tokens and warns once per value", async () => {
     const harness = createHarness();
     const controller = createShellSheetController<Snap, Region>(closed());
@@ -732,6 +799,8 @@ describe("target DOM binding", () => {
       type: string,
       y: number,
       time: number,
+      pointerId = 1,
+      isPrimary = true,
     ): PointerEvent => {
       const event = new MouseEvent(type, {
         bubbles: true,
@@ -741,8 +810,8 @@ describe("target DOM binding", () => {
         button: 0,
       }) as PointerEvent;
       Object.defineProperties(event, {
-        pointerId: { value: 1 },
-        isPrimary: { value: true },
+        pointerId: { value: pointerId },
+        isPrimary: { value: isPrimary },
         timeStamp: { value: time },
       });
       return event;
@@ -754,6 +823,13 @@ describe("target DOM binding", () => {
     harness.frames.flush();
 
     expect(eventTypes).toEqual(["interaction-started"]);
+    const heightBeforeSecondPointer = anatomy.popup.style.height;
+    handleLabel.dispatchEvent(pointer("pointerdown", 300, 45, 2, false));
+    handleLabel.dispatchEvent(pointer("pointermove", 100, 50, 2, false));
+    handleLabel.dispatchEvent(pointer("pointerup", 100, 55, 2, false));
+    harness.frames.flush();
+    expect(eventTypes).toEqual(["interaction-started"]);
+    expect(anatomy.popup.style.height).toBe(heightBeforeSecondPointer);
 
     handleLabel.dispatchEvent(pointer("pointerup", 480, 60));
     expect(eventTypes).toEqual([

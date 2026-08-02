@@ -1,22 +1,36 @@
 export { createShellSheetController } from "./controller.js";
-export {
-  assertSnapPoints,
-  clampSheetHeight,
-  resolveSnapPoints,
-  selectSnapPoint,
-} from "./snap-points.js";
+export { selectReleaseDestination } from "./release-selection.js";
+export { applyRubberBand } from "./rubber-band.js";
+export { assertSnapPoints, resolveSnapPoints } from "./snap-points.js";
+export { assertShellSheetTarget } from "./target.js";
 export type {
-  ShellSheetCloseReason,
-  ShellSheetControlledState,
+  ApplyRubberBandInput,
+  ResolvedShellSheetSnapPoint,
+  SelectShellSheetReleaseDestinationInput,
+  ShellCloseReason,
+  ShellCloseRequestDetails,
+  ShellGestureRelease,
+  ShellInteractionCancelReason,
+  ShellInteractionOrigin,
+  ShellRegionTarget,
+  ShellRegionTransition,
+  ShellRequestOrigin,
+  ShellSheetClosedTarget,
   ShellSheetController,
-  ShellSheetControllerOptions,
   ShellSheetEvent,
+  ShellSheetFact,
   ShellSheetListener,
   ShellSheetMetrics,
+  ShellSheetOpenTarget,
+  ShellSheetPhase,
+  ShellSheetReleaseDestination,
+  ShellSheetRequest,
   ShellSheetSnapPoint,
   ShellSheetSnapPointSize,
   ShellSheetSnapshot,
-  ShellSheetStatus,
-  ResolvedShellSheetSnapPoint,
-  SelectSnapPointOptions,
+  ShellSheetTarget,
+  ShellSnapRequestDetails,
+  ShellTransitionCancelReason,
+  ShellTransitionDirection,
+  ShellTransitionIntent,
 } from "./types.js";

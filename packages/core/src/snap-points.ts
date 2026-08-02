@@ -1,15 +1,27 @@
 import type {
+  ResolvedShellSheetSnapPoint,
   ShellSheetMetrics,
   ShellSheetSnapPoint,
-  ResolvedShellSheetSnapPoint,
-  SelectSnapPointOptions,
 } from "./types.js";
+
+const assertFinite = (name: string, value: number): void => {
+  if (!Number.isFinite(value)) {
+    throw new Error(`ShellSheet ${name} must be finite.`);
+  }
+};
+
+const assertNonNegative = (name: string, value: number): void => {
+  assertFinite(name, value);
+  if (value < 0) {
+    throw new Error(`ShellSheet ${name} must not be negative.`);
+  }
+};
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
-export function assertSnapPoints(
-  snapPoints: readonly ShellSheetSnapPoint[],
+export function assertSnapPoints<TSnap extends string>(
+  snapPoints: readonly ShellSheetSnapPoint<TSnap>[],
 ): void {
   if (snapPoints.length === 0) {
     throw new Error("ShellSheet requires at least one snap point.");
@@ -18,159 +30,107 @@ export function assertSnapPoints(
   const ids = new Set<string>();
 
   for (const point of snapPoints) {
-    if (!point.id.trim()) {
+    if (point.id.trim().length === 0) {
       throw new Error("ShellSheet snap point ids must not be empty.");
     }
-
     if (ids.has(point.id)) {
       throw new Error(`Duplicate ShellSheet snap point id: ${point.id}`);
     }
-
     ids.add(point.id);
 
+    if (point.size.type === "content") {
+      if (point.size.maxRatio !== undefined) {
+        assertFinite(`content maxRatio for "${point.id}"`, point.size.maxRatio);
+        if (point.size.maxRatio <= 0 || point.size.maxRatio > 1) {
+          throw new Error(
+            `Content maxRatio for "${point.id}" must be greater than 0 and at most 1.`,
+          );
+        }
+      }
+      continue;
+    }
+
+    assertFinite(`size for "${point.id}"`, point.size.value);
     if (point.size.type === "ratio") {
       if (point.size.value <= 0 || point.size.value > 1) {
         throw new Error(
           `Ratio snap point "${point.id}" must be greater than 0 and at most 1.`,
         );
       }
-    } else if (point.size.type === "pixels" && point.size.value < 0) {
+    } else if (point.size.value < 0) {
       throw new Error(`Pixel snap point "${point.id}" must not be negative.`);
-    } else if (
-      point.size.type === "content" &&
-      point.size.maxRatio !== undefined &&
-      (point.size.maxRatio <= 0 || point.size.maxRatio > 1)
-    ) {
-      throw new Error(
-        `Content maxRatio for "${point.id}" must be greater than 0 and at most 1.`,
-      );
     }
   }
 }
 
-export function resolveSnapPoints(
-  snapPoints: readonly ShellSheetSnapPoint[],
-  metrics: ShellSheetMetrics,
-): ResolvedShellSheetSnapPoint[] {
-  assertSnapPoints(snapPoints);
+const assertMetrics = (metrics: ShellSheetMetrics): void => {
+  assertNonNegative("viewportHeight", metrics.viewportHeight);
+  assertNonNegative("insetTop", metrics.insetTop);
+  assertNonNegative("insetBottom", metrics.insetBottom);
+  assertNonNegative("headerHeight", metrics.headerHeight);
+  assertNonNegative("bodyNaturalHeight", metrics.bodyNaturalHeight);
+  assertNonNegative("footerHeight", metrics.footerHeight);
 
-  const topInset = metrics.topInset ?? 0;
-  const bottomInset = metrics.bottomInset ?? 0;
-  const handleHeight = metrics.handleHeight ?? 0;
-  const availableHeight = Math.max(
+  if (metrics.minHeight !== undefined) {
+    assertNonNegative("minHeight", metrics.minHeight);
+  }
+  if (metrics.maxHeight !== undefined) {
+    assertNonNegative("maxHeight", metrics.maxHeight);
+  }
+  if (
+    metrics.minHeight !== undefined &&
+    metrics.maxHeight !== undefined &&
+    metrics.minHeight > metrics.maxHeight
+  ) {
+    throw new Error("ShellSheet minHeight must not exceed maxHeight.");
+  }
+};
+
+export function resolveSnapPoints<TSnap extends string>(
+  snapPoints: readonly ShellSheetSnapPoint<TSnap>[],
+  metrics: ShellSheetMetrics,
+): readonly ResolvedShellSheetSnapPoint<TSnap>[] {
+  assertSnapPoints(snapPoints);
+  assertMetrics(metrics);
+
+  const available = Math.max(
     0,
-    metrics.viewportHeight - topInset - bottomInset,
+    metrics.viewportHeight - metrics.insetTop - metrics.insetBottom,
   );
-  const minHeight = clamp(metrics.minHeight ?? 0, 0, availableHeight);
-  const maxHeight = clamp(
-    metrics.maxHeight ?? availableHeight,
-    minHeight,
-    availableHeight,
-  );
+  const upperBound = Math.min(available, metrics.maxHeight ?? available);
+  const lowerBound = Math.min(upperBound, metrics.minHeight ?? 0);
+  const naturalHeight =
+    metrics.headerHeight +
+    metrics.bodyNaturalHeight +
+    metrics.footerHeight;
 
   return snapPoints
-    .map((point) => {
-      let height: number;
-
+    .map((point, declarationIndex) => {
+      let rawHeight: number;
       switch (point.size.type) {
         case "ratio":
-          height = availableHeight * point.size.value;
+          rawHeight = available * point.size.value;
           break;
         case "pixels":
-          height = point.size.value;
+          rawHeight = point.size.value;
           break;
-        case "content": {
-          const contentMaximum =
-            availableHeight * (point.size.maxRatio ?? 1);
-          height = Math.min(
-            metrics.contentHeight + handleHeight,
-            contentMaximum,
+        case "content":
+          rawHeight = Math.min(
+            naturalHeight,
+            available * (point.size.maxRatio ?? 1),
           );
           break;
-        }
       }
-
-      const resolvedHeight = clamp(height, minHeight, maxHeight);
 
       return {
         id: point.id,
-        height: resolvedHeight,
-        offset: metrics.viewportHeight - bottomInset - resolvedHeight,
+        height: clamp(rawHeight, lowerBound, upperBound),
+        declarationIndex,
       };
     })
-    .sort((left, right) => left.height - right.height);
-}
-
-export function selectSnapPoint({
-  currentHeight,
-  currentSnapPoint,
-  velocityY,
-  snapPoints,
-  velocityThreshold = 700,
-}: SelectSnapPointOptions): ResolvedShellSheetSnapPoint {
-  if (snapPoints.length === 0) {
-    throw new Error("Cannot select a snap point from an empty list.");
-  }
-
-  const ordered = [...snapPoints].sort(
-    (left, right) => left.height - right.height,
-  );
-  const currentIndex = ordered.findIndex(
-    (point) => point.id === currentSnapPoint,
-  );
-
-  if (Math.abs(velocityY) >= velocityThreshold) {
-    if (velocityY < 0) {
-      const taller = ordered.find((point) => point.height > currentHeight + 0.5);
-      return taller ?? ordered[ordered.length - 1]!;
-    }
-
-    for (let index = ordered.length - 1; index >= 0; index -= 1) {
-      const point = ordered[index];
-      if (point && point.height < currentHeight - 0.5) {
-        return point;
-      }
-    }
-
-    return ordered[0]!;
-  }
-
-  return ordered.reduce((nearest, point) => {
-    const pointDistance = Math.abs(point.height - currentHeight);
-    const nearestDistance = Math.abs(nearest.height - currentHeight);
-
-    if (pointDistance < nearestDistance) {
-      return point;
-    }
-
-    if (pointDistance === nearestDistance && currentIndex >= 0) {
-      return point.id === currentSnapPoint ? point : nearest;
-    }
-
-    return nearest;
-  });
-}
-
-export function clampSheetHeight(
-  height: number,
-  snapPoints: readonly ResolvedShellSheetSnapPoint[],
-  rubberBand = 0,
-): number {
-  if (snapPoints.length === 0) {
-    return Math.max(0, height);
-  }
-
-  const heights = snapPoints.map((point) => point.height);
-  const minimum = Math.min(...heights);
-  const maximum = Math.max(...heights);
-
-  if (height < minimum) {
-    return minimum - (minimum - height) * clamp(rubberBand, 0, 1);
-  }
-
-  if (height > maximum) {
-    return maximum + (height - maximum) * clamp(rubberBand, 0, 1);
-  }
-
-  return height;
+    .sort(
+      (left, right) =>
+        left.height - right.height ||
+        left.declarationIndex - right.declarationIndex,
+    );
 }

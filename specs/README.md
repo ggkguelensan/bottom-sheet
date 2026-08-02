@@ -76,19 +76,21 @@ intent
 
 Состояние на 2026-08-02:
 
-| Область | Статус | Главный gap |
+| Область | Статус | Нормативное доказательство |
 | --- | --- | --- |
-| Core controller и snap algorithms | Partial | Текущий controller не реализует target union, immutable target/settled snapshot, tokenized lifecycle и projected release |
-| DOM binding | Partial | Текущий binding смешивает старый controller protocol с DOM mechanics; нет transaction scheduler, region registry/coordinator и measured presentation morph |
-| Motion driver | Partial | Cancel result ещё не нормализован в общий lifecycle |
-| Effector adapter | Partial | Текущий convenience binding создаёт собственный `$state`; нужен adapter к производному `$shellTarget` приложения |
-| React adapter | Prototype | Монолитный API вместо целевого compound API; transition существует только для одного content region |
-| Styling compatibility | Specified | Base UI-shaped contract зафиксирован; implementation и conformance tests ещё не выполнены |
-| Platform/SSR/build | Specified | Target stack и package contract зафиксированы; Start demo, SSR fixtures и packed-package gates ещё не реализованы |
-| Lovecraft demo | Prototype | Нет полного async stale-result showcase и всех conformance states |
-| Quality gates | Partial | Есть unit/type/build checks; нужны contract, accessibility, SSR и browser interaction tests |
+| Core controller и snap algorithms | Conformant | Public target/request/fact tests доказывают cached immutable snapshots, FIFO/reentrant publication, tokenized terminal lifecycle, projected release и pure geometry |
+| DOM binding | Conformant | Fake-environment и browser contracts доказывают stale-safe registry, read-before-write frames, единый interruptible coordinator, regions, gestures, modality, viewport и same-Popup morph |
+| Motion driver | Conformant | Общий driver contract нормализует finish/cancel/idempotent stop; static и bundle gates допускают только `motion/mini` |
+| Effector adapter | Conformant | Global/forked-scope tests синхронизируют application-owned `$target` и проверяют отсутствие adapter-owned domain state/feedback loop |
+| React adapter | Conformant | Atomic/controller/convenience, compound anatomy, StrictMode registration, Suspense readiness, same Popup, SSR и React 18/19 fixtures проходят |
+| Styling compatibility | Conformant | Exact tags/states/variables проверены contracts; Base UI-shaped drawer selector/token port компилируется в consumer fixture без bundled CSS |
+| Platform/SSR/build | Conformant | TanStack Start production/SSR, request isolation, hydration policy, TypeScript-only scan, packed ESM/types и browser matrix проходят |
+| Lovecraft demo | Conformant | Все пять независимых entrances, async abort/stale guard, draggable/non-draggable snaps, pinned regions, scrolling и responsive presentation покрыты browser tests |
+| Quality gates | Conformant | Полный matrix из `quality.md`, architecture boundaries и measured gzip budgets проходит на `main` |
 
-`Partial` и `Prototype` означают, что public package ещё не считается v1-ready.
+`Conformant` означает соответствие target v1 на текущем commit. Любое изменение
+observable contract снова проходит spec → test → implementation → demo →
+verification; статус не заменяет release gates конкретного commit.
 
 ## Зафиксированные архитектурные решения v1
 

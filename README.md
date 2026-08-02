@@ -26,8 +26,8 @@ Start here:
 - [Lovecraft conformance application](./specs/examples/lovecraft.md)
 - [Quality and release gates](./specs/quality.md)
 
-The current packages and demo are a partial prototype. Their existing API is
-not the v1 contract; the exact implementation gaps are tracked in
+The packages and reference application conform to the Shell Sheet v1 target.
+Current evidence and architecture-decision gates are tracked in
 [`specs/README.md`](./specs/README.md#текущее-соответствие-целевой-версии).
 
 ## Target packages
@@ -52,8 +52,12 @@ npm run typecheck:demo
 npm test
 npm run build
 npm run build:lovecraft
+npm run test:ssr
+npm run test:browser
+npm run check:packages
 npm run dev:vanilla
 ```
 
-The target reference application will migrate from the current Vite prototype
-to TanStack Start as specified in [`specs/platform.md`](./specs/platform.md).
+The TanStack Start reference application lives in
+[`examples/lovecraft-start`](./examples/lovecraft-start) and implements the
+conformance scenarios in [`specs/examples/lovecraft.md`](./specs/examples/lovecraft.md).

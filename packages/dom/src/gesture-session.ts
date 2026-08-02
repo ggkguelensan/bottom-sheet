@@ -307,20 +307,27 @@ export function createGestureSession<
     cancelPointer("capture-lost", true);
   };
 
-  const onHandleClick = (): void => {
+  const onHandleClick = (event: MouseEvent): void => {
     if (suppressHandleClick) {
       suppressHandleClick = false;
       return;
     }
-    const target = options.controller.getSnapshot().authoritativeTarget;
-    const geometry = options.getGeometry();
-    if (target?.open !== true || !target.draggable || !geometry) return;
-    const points = distinctPhysicalPoints(geometry.resolvedSnapPoints);
-    const currentIndex = points.findIndex((point) => point.id === target.snapPoint);
-    const next = points[currentIndex === points.length - 1 ? 0 : currentIndex + 1];
-    if (next) {
-      options.controller.requestSnap(next.id, { origin: "trigger" });
-    }
+    void Promise.resolve().then(() => {
+      if (destroyed || event.defaultPrevented) return;
+      const target = options.controller.getSnapshot().authoritativeTarget;
+      const geometry = options.getGeometry();
+      if (target?.open !== true || !target.draggable || !geometry) return;
+      const points = distinctPhysicalPoints(geometry.resolvedSnapPoints);
+      const currentIndex = points.findIndex(
+        (point) => point.id === target.snapPoint,
+      );
+      const next = points[
+        currentIndex === points.length - 1 ? 0 : currentIndex + 1
+      ];
+      if (next) {
+        options.controller.requestSnap(next.id, { origin: "trigger" });
+      }
+    });
   };
 
   const attachArea = (

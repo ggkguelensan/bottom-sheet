@@ -592,4 +592,35 @@ describe("target DOM binding", () => {
 
     binding.destroy();
   });
+
+  it("runs Handle click toggle after consumer cancellation handlers", async () => {
+    const harness = createHarness();
+    const controller = createShellSheetController<Snap, Region>(closed());
+    const binding = bindShellSheetToDom(controller, {
+      environment: harness.environment,
+      animation: harness.animation,
+      scrollLock: { acquire: () => () => undefined },
+      backgroundIsolation: { acquire: () => () => undefined },
+    });
+    const anatomy = registerAnatomy(binding);
+    controller.sync(opened("A"));
+    await flushAll(harness.frames);
+    const requests: string[] = [];
+    controller.subscribe((_snapshot, event) => {
+      if (event.type.endsWith("requested")) requests.push(event.type);
+    });
+    const prevent = (event: MouseEvent) => event.preventDefault();
+    anatomy.handle.addEventListener("click", prevent);
+
+    anatomy.handle.click();
+    await Promise.resolve();
+    expect(requests).toEqual([]);
+
+    anatomy.handle.removeEventListener("click", prevent);
+    anatomy.handle.click();
+    await Promise.resolve();
+    expect(requests).toEqual(["snap-requested"]);
+
+    binding.destroy();
+  });
 });

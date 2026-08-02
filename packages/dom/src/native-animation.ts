@@ -1,10 +1,10 @@
 import type {
-  BottomSheetAnimationDriver,
-  BottomSheetEasing,
-  BottomSheetKeyframes,
+  ShellSheetAnimationDriver,
+  ShellSheetEasing,
+  ShellSheetKeyframes,
 } from "./types.js";
 
-const toCssEasing = (easing: BottomSheetEasing): string =>
+const toCssEasing = (easing: ShellSheetEasing): string =>
   typeof easing === "string"
     ? {
         linear: "linear",
@@ -15,10 +15,10 @@ const toCssEasing = (easing: BottomSheetEasing): string =>
     : `cubic-bezier(${easing.join(",")})`;
 
 const toPropertyIndexedKeyframes = (
-  keyframes: BottomSheetKeyframes,
+  keyframes: ShellSheetKeyframes,
 ): PropertyIndexedKeyframes => keyframes as PropertyIndexedKeyframes;
 
-export function createNativeAnimationDriver(): BottomSheetAnimationDriver {
+export function createNativeAnimationDriver(): ShellSheetAnimationDriver {
   return {
     animate(element, keyframes, options) {
       const animation = element.animate(toPropertyIndexedKeyframes(keyframes), {

@@ -1,12 +1,12 @@
-export { bindBottomSheetToDom } from "./bind.js";
+export { bindShellSheetToDom } from "./bind.js";
 export { createNativeAnimationDriver } from "./native-animation.js";
 export type {
-  BottomSheetAnimationControls,
-  BottomSheetAnimationDriver,
-  BottomSheetAnimationOptions,
-  BottomSheetDomBinding,
-  BottomSheetDomOptions,
-  BottomSheetEasing,
-  BottomSheetElements,
-  BottomSheetKeyframes,
+  ShellSheetAnimationControls,
+  ShellSheetAnimationDriver,
+  ShellSheetAnimationOptions,
+  ShellSheetDomBinding,
+  ShellSheetDomOptions,
+  ShellSheetEasing,
+  ShellSheetElements,
+  ShellSheetKeyframes,
 } from "./types.js";

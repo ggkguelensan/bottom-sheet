@@ -14,10 +14,11 @@
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
     "paths": {
-      "@adaptive-bottom-sheet/core": ["./packages/core/src/index.ts"],
-      "@adaptive-bottom-sheet/dom": ["./packages/dom/src/index.ts"],
-      "@adaptive-bottom-sheet/motion": ["./packages/motion/src/index.ts"],
-      "@adaptive-bottom-sheet/effector": ["./packages/effector/src/index.ts"]
+      "@shell-sheet/core": ["./packages/core/src/index.ts"],
+      "@shell-sheet/dom": ["./packages/dom/src/index.ts"],
+      "@shell-sheet/motion": ["./packages/motion/src/index.ts"],
+      "@shell-sheet/effector": ["./packages/effector/src/index.ts"],
+      "@shell-sheet/react": ["./packages/react/src/index.ts"]
     }
   }
 }

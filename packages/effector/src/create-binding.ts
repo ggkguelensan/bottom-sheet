@@ -5,54 +5,54 @@ import {
   sample,
 } from "effector";
 import type {
-  BottomSheetCloseReason,
-  BottomSheetControlledState,
-  BottomSheetController,
-} from "@adaptive-bottom-sheet/core";
+  ShellSheetCloseReason,
+  ShellSheetControlledState,
+  ShellSheetController,
+} from "@shell-sheet/core";
 import type {
-  BottomSheetControllerEventPayload,
-  BottomSheetEffectorBinding,
-  BottomSheetEffectorOptions,
+  ShellSheetControllerEventPayload,
+  ShellSheetEffectorBinding,
+  ShellSheetEffectorOptions,
 } from "./types.js";
 
-export function createBottomSheetBinding(
-  options: BottomSheetEffectorOptions,
-): BottomSheetEffectorBinding {
+export function createShellSheetBinding(
+  options: ShellSheetEffectorOptions,
+): ShellSheetEffectorBinding {
   const validateState = options.validateState ?? (() => true);
 
   if (!validateState(options.initialState)) {
-    throw new Error("Invalid initial BottomSheet state.");
+    throw new Error("Invalid initial ShellSheet state.");
   }
 
-  const openRequested = createEvent<void>("bottomSheet.openRequested");
-  const closeRequested = createEvent<BottomSheetCloseReason | void>(
-    "bottomSheet.closeRequested",
+  const openRequested = createEvent<void>("shellSheet.openRequested");
+  const closeRequested = createEvent<ShellSheetCloseReason | void>(
+    "shellSheet.closeRequested",
   );
-  const snapRequested = createEvent<string>("bottomSheet.snapRequested");
-  const stateReplaced = createEvent<BottomSheetControlledState>(
-    "bottomSheet.stateReplaced",
+  const snapRequested = createEvent<string>("shellSheet.snapRequested");
+  const stateReplaced = createEvent<ShellSheetControlledState>(
+    "shellSheet.stateReplaced",
   );
-  const controllerAttached = createEvent<BottomSheetController>(
-    "bottomSheet.controllerAttached",
+  const controllerAttached = createEvent<ShellSheetController>(
+    "shellSheet.controllerAttached",
   );
   const controllerDetached = createEvent<void>(
-    "bottomSheet.controllerDetached",
+    "shellSheet.controllerDetached",
   );
   const controllerEventReceived =
-    createEvent<BottomSheetControllerEventPayload>(
-      "bottomSheet.controllerEventReceived",
+    createEvent<ShellSheetControllerEventPayload>(
+      "shellSheet.controllerEventReceived",
     );
 
-  const $controller = createStore<BottomSheetController | null>(null, {
-    name: "bottomSheet.$controller",
+  const $controller = createStore<ShellSheetController | null>(null, {
+    name: "shellSheet.$controller",
     serialize: "ignore",
   })
     .on(controllerAttached, (_, controller) => controller)
     .reset(controllerDetached);
 
-  const $state = createStore<BottomSheetControlledState>(
+  const $state = createStore<ShellSheetControlledState>(
     options.initialState,
-    { name: "bottomSheet.$state" },
+    { name: "shellSheet.$state" },
   )
     .on(openRequested, (state) =>
       state.open ? state : { ...state, open: true },
@@ -91,15 +91,15 @@ export function createBottomSheetBinding(
   const $open = $state.map((state) => state.open);
   const $snapPoint = $state.map((state) => state.snapPoint);
   const $snapshot = createStore<
-    BottomSheetControllerEventPayload["snapshot"] | null
+    ShellSheetControllerEventPayload["snapshot"] | null
   >(null, {
-    name: "bottomSheet.$snapshot",
+    name: "shellSheet.$snapshot",
     serialize: "ignore",
   })
     .on(controllerEventReceived, (_, payload) => payload.snapshot)
     .reset(controllerDetached);
-  const $lastCloseReason = createStore<BottomSheetCloseReason | null>(null, {
-    name: "bottomSheet.$lastCloseReason",
+  const $lastCloseReason = createStore<ShellSheetCloseReason | null>(null, {
+    name: "shellSheet.$lastCloseReason",
   })
     .on(closeRequested, (_, reason) => reason || "api")
     .on(controllerEventReceived, (reason, { event }) =>
@@ -108,13 +108,13 @@ export function createBottomSheetBinding(
 
   const syncControllerFx = createEffect<
     {
-      controller: BottomSheetController;
-      state: BottomSheetControlledState;
+      controller: ShellSheetController;
+      state: ShellSheetControlledState;
     },
     void,
     Error
   >({
-    name: "bottomSheet.syncControllerFx",
+    name: "shellSheet.syncControllerFx",
     handler: ({ controller, state }) => controller.sync(state),
   });
 

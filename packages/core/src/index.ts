@@ -1,4 +1,4 @@
-export { createBottomSheetController } from "./controller.js";
+export { createShellSheetController } from "./controller.js";
 export {
   assertSnapPoints,
   clampSheetHeight,
@@ -6,17 +6,17 @@ export {
   selectSnapPoint,
 } from "./snap-points.js";
 export type {
-  BottomSheetCloseReason,
-  BottomSheetControlledState,
-  BottomSheetController,
-  BottomSheetControllerOptions,
-  BottomSheetEvent,
-  BottomSheetListener,
-  BottomSheetMetrics,
-  BottomSheetSnapPoint,
-  BottomSheetSnapPointSize,
-  BottomSheetSnapshot,
-  BottomSheetStatus,
-  ResolvedBottomSheetSnapPoint,
+  ShellSheetCloseReason,
+  ShellSheetControlledState,
+  ShellSheetController,
+  ShellSheetControllerOptions,
+  ShellSheetEvent,
+  ShellSheetListener,
+  ShellSheetMetrics,
+  ShellSheetSnapPoint,
+  ShellSheetSnapPointSize,
+  ShellSheetSnapshot,
+  ShellSheetStatus,
+  ResolvedShellSheetSnapPoint,
   SelectSnapPointOptions,
 } from "./types.js";

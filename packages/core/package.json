@@ -1,7 +1,7 @@
 {
-  "name": "@adaptive-bottom-sheet/core",
+  "name": "@shell-sheet/core",
   "version": "0.1.0",
-  "description": "Framework-agnostic state and snap-point engine for adaptive bottom sheets.",
+  "description": "Framework-agnostic state and snap-point engine for Shell Sheet.",
   "type": "module",
   "sideEffects": false,
   "files": ["dist"],

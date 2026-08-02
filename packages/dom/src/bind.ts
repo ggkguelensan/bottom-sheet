@@ -2,16 +2,16 @@ import {
   clampSheetHeight,
   resolveSnapPoints,
   selectSnapPoint,
-  type BottomSheetController,
-  type BottomSheetEvent,
-  type ResolvedBottomSheetSnapPoint,
-} from "@adaptive-bottom-sheet/core";
+  type ShellSheetController,
+  type ShellSheetEvent,
+  type ResolvedShellSheetSnapPoint,
+} from "@shell-sheet/core";
 import { createNativeAnimationDriver } from "./native-animation.js";
 import type {
-  BottomSheetAnimationControls,
-  BottomSheetDomBinding,
-  BottomSheetDomOptions,
-  BottomSheetElements,
+  ShellSheetAnimationControls,
+  ShellSheetDomBinding,
+  ShellSheetDomOptions,
+  ShellSheetElements,
 } from "./types.js";
 
 const focusableSelector = [
@@ -31,31 +31,35 @@ const readOption = (
 const isHTMLElement = (value: Element | null): value is HTMLElement =>
   value instanceof HTMLElement;
 
-export function bindBottomSheetToDom(
-  controller: BottomSheetController,
-  elements: BottomSheetElements,
-  options: BottomSheetDomOptions = {},
-): BottomSheetDomBinding {
-  const animation = options.animation ?? createNativeAnimationDriver();
-  const easing = options.easing ?? ([0.32, 0.72, 0, 1] as const);
-  const modality = options.modality ?? "modal";
-  const isModal = modality === "modal";
-  const draggable = options.draggable ?? true;
-  const velocityThreshold = options.velocityThreshold ?? 700;
-  const closeOnBackdrop = options.closeOnBackdrop ?? isModal;
-  const closeOnEscape = options.closeOnEscape ?? true;
-  const dismissOnDragDown = options.dismissOnDragDown ?? draggable;
-  const dismissDistanceRatio = options.dismissDistanceRatio ?? 0.25;
-  const lockScrollEnabled = options.lockScroll ?? isModal;
-  const trapFocus = options.trapFocus ?? isModal;
-  const restoreFocus = options.restoreFocus ?? isModal;
-  const reducedMotionSetting = options.reducedMotion ?? "media";
+export function bindShellSheetToDom(
+  controller: ShellSheetController,
+  elements: ShellSheetElements,
+  options: ShellSheetDomOptions = {},
+): ShellSheetDomBinding {
+  const nativeAnimation = createNativeAnimationDriver();
+  let currentOptions = options;
+  let animation = options.animation ?? nativeAnimation;
+  let easing = options.easing ?? ([0.32, 0.72, 0, 1] as const);
+  let modality = options.modality ?? "modal";
+  let isModal = modality === "modal";
+  let draggable = options.draggable ?? true;
+  let velocityThreshold = options.velocityThreshold ?? 700;
+  let closeOnBackdrop = options.closeOnBackdrop ?? isModal;
+  let closeOnEscape = options.closeOnEscape ?? true;
+  let dismissOnDragDown = options.dismissOnDragDown ?? draggable;
+  let dismissDistanceRatio = options.dismissDistanceRatio ?? 0.25;
+  let lockScrollEnabled = options.lockScroll ?? isModal;
+  let trapFocus = options.trapFocus ?? isModal;
+  let restoreFocus = options.restoreFocus ?? isModal;
+  let reducedMotionSetting = options.reducedMotion ?? "media";
 
   let destroyed = false;
-  let resolvedSnapPoints: ResolvedBottomSheetSnapPoint[] = [];
+  let resolvedSnapPoints: ResolvedShellSheetSnapPoint[] = [];
   let currentHeight = 0;
   let animationSequence = 0;
-  let activeAnimations: BottomSheetAnimationControls[] = [];
+  let activeAnimations: ShellSheetAnimationControls[] = [];
+  let openingPreparationFrame: number | null = null;
+  let openingAnimationFrame: number | null = null;
   let previouslyFocused: HTMLElement | null = null;
   let scrollLockCleanup: (() => void) | null = null;
   let inertCleanup: (() => void) | null = null;
@@ -75,7 +79,7 @@ export function bindBottomSheetToDom(
       window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
   const duration = (value: number): number =>
-    prefersReducedMotion() ? Math.min(1, value) : value;
+    prefersReducedMotion() ? Math.min(120, value) : value;
 
   const viewportHeight = (): number =>
     Math.round(window.visualViewport?.height ?? window.innerHeight);
@@ -83,10 +87,10 @@ export function bindBottomSheetToDom(
   const refreshMeasurements = (): void => {
     const contentHeight =
       elements.content?.scrollHeight ?? elements.main.scrollHeight;
-    const topInset = readOption(options.topInset, 0);
-    const bottomInset = readOption(options.bottomInset, 0);
+    const topInset = readOption(currentOptions.topInset, 0);
+    const bottomInset = readOption(currentOptions.bottomInset, 0);
     const maxHeight = readOption(
-      options.maxHeight,
+      currentOptions.maxHeight,
       Math.max(0, viewportHeight() - topInset - bottomInset),
     );
 
@@ -96,12 +100,12 @@ export function bindBottomSheetToDom(
       topInset,
       bottomInset,
       handleHeight: elements.handle?.getBoundingClientRect().height ?? 0,
-      minHeight: options.minHeight ?? 0,
+      minHeight: currentOptions.minHeight ?? 0,
       maxHeight,
     });
 
     elements.root.style.setProperty(
-      "--bottom-sheet-viewport-height",
+      "--shell-sheet-viewport-height",
       `${viewportHeight()}px`,
     );
 
@@ -119,13 +123,13 @@ export function bindBottomSheetToDom(
       currentHeight = selected.height;
       elements.main.style.height = `${currentHeight}px`;
       elements.root.style.setProperty(
-        "--bottom-sheet-height",
+        "--shell-sheet-height",
         `${currentHeight}px`,
       );
     }
   };
 
-  const selectedSnapPoint = (): ResolvedBottomSheetSnapPoint => {
+  const selectedSnapPoint = (): ResolvedShellSheetSnapPoint => {
     const selected = resolvedSnapPoints.find(
       (point) => point.id === controller.getSnapshot().snapPoint,
     );
@@ -141,12 +145,21 @@ export function bindBottomSheetToDom(
 
   const stopAnimations = (): void => {
     animationSequence += 1;
+    if (openingPreparationFrame !== null) {
+      window.cancelAnimationFrame(openingPreparationFrame);
+      openingPreparationFrame = null;
+    }
+    if (openingAnimationFrame !== null) {
+      window.cancelAnimationFrame(openingAnimationFrame);
+      openingAnimationFrame = null;
+    }
     for (const controls of activeAnimations) controls.stop();
     activeAnimations = [];
+    elements.root.style.visibility = "";
   };
 
   const runAnimations = (
-    controls: BottomSheetAnimationControls[],
+    controls: ShellSheetAnimationControls[],
     onFinish: () => void,
   ): void => {
     stopAnimations();
@@ -217,6 +230,7 @@ export function bindBottomSheetToDom(
 
   const hideOverlay = (): void => {
     elements.root.hidden = true;
+    elements.main.style.opacity = "";
     scrollLockCleanup?.();
     inertCleanup?.();
 
@@ -256,14 +270,14 @@ export function bindBottomSheetToDom(
     currentHeight = targetHeight;
     elements.main.style.height = `${targetHeight}px`;
     elements.root.style.setProperty(
-      "--bottom-sheet-height",
+      "--shell-sheet-height",
       `${targetHeight}px`,
     );
 
     const controls = animation.animate(
       elements.main,
       { height: [`${fromHeight}px`, `${targetHeight}px`] },
-      { duration: duration(options.snapDuration ?? 320), easing },
+      { duration: duration(currentOptions.snapDuration ?? 280), easing },
     );
 
     runAnimations([controls], () => {
@@ -271,69 +285,126 @@ export function bindBottomSheetToDom(
     });
   };
 
-  const animateState = (event: BottomSheetEvent): void => {
+  const animateState = (event: ShellSheetEvent): void => {
     const snapshot = controller.getSnapshot();
     updateAttributes();
 
     if (event.type !== "state-synced") return;
 
+    if (snapshot.status === "opening") {
+      stopAnimations();
+      showOverlay();
+      elements.root.style.visibility = "hidden";
+      elements.backdrop?.style.setProperty("opacity", "0");
+
+      // Framework stores can publish `open` before their new content reaches
+      // the DOM. Wait for that commit, measure the real screen, place it below
+      // the viewport for one frame, then start the entrance transition.
+      openingPreparationFrame = window.requestAnimationFrame(() => {
+        openingPreparationFrame = null;
+        const currentSnapshot = controller.getSnapshot();
+        if (
+          destroyed ||
+          !currentSnapshot.open ||
+          currentSnapshot.status !== "opening"
+        ) {
+          elements.root.style.visibility = "";
+          return;
+        }
+
+        refreshMeasurements();
+        updateAttributes();
+        const target = selectedSnapPoint();
+        const reduceMotion = prefersReducedMotion();
+        const hiddenTransform = reduceMotion
+          ? "translateY(0px)"
+          : `translateY(${target.height + readOption(currentOptions.bottomInset, 0)}px)`;
+
+        currentHeight = target.height;
+        elements.main.style.height = `${target.height}px`;
+        elements.root.style.setProperty(
+          "--shell-sheet-height",
+          `${target.height}px`,
+        );
+        elements.main.style.transform = hiddenTransform;
+        elements.main.style.opacity = reduceMotion ? "0" : "1";
+        elements.root.style.visibility = "";
+
+        openingAnimationFrame = window.requestAnimationFrame(() => {
+          openingAnimationFrame = null;
+          const latestSnapshot = controller.getSnapshot();
+          if (
+            destroyed ||
+            !latestSnapshot.open ||
+            latestSnapshot.status !== "opening"
+          ) {
+            return;
+          }
+
+          elements.main.style.transform = "translateY(0px)";
+          elements.main.style.opacity = "1";
+          elements.backdrop?.style.setProperty("opacity", "1");
+
+          const surface = animation.animate(
+            elements.main,
+            reduceMotion
+              ? { opacity: [0, 1] }
+              : { transform: [hiddenTransform, "translateY(0px)"] },
+            { duration: duration(currentOptions.openDuration ?? 280), easing },
+          );
+          const animations: ShellSheetAnimationControls[] = [surface];
+
+          if (elements.backdrop) {
+            animations.push(
+              animation.animate(
+                elements.backdrop,
+                { opacity: [0, 1] },
+                { duration: duration(currentOptions.openDuration ?? 280), easing },
+              ),
+            );
+          }
+
+          runAnimations(animations, () => {
+            if (isModal) focusSheet();
+            controller.settle();
+          });
+        });
+      });
+
+      return;
+    }
+
     refreshMeasurements();
     const target = selectedSnapPoint();
 
-    if (snapshot.status === "opening") {
-      showOverlay();
-      currentHeight = target.height;
-      elements.main.style.height = `${target.height}px`;
-      elements.main.style.transform = "translateY(0px)";
-      elements.backdrop?.style.setProperty("opacity", "1");
-
+    if (snapshot.status === "closing") {
+      const reduceMotion = prefersReducedMotion();
       const surface = animation.animate(
         elements.main,
-        {
-          transform: [
-            `translateY(${target.height + readOption(options.bottomInset, 0)}px)`,
-            "translateY(0px)",
-          ],
-        },
-        { duration: duration(options.openDuration ?? 320), easing },
+        reduceMotion
+          ? { opacity: [1, 0] }
+          : {
+              transform: [
+                elements.main.style.transform || "translateY(0px)",
+                `translateY(${currentHeight + readOption(currentOptions.bottomInset, 0)}px)`,
+              ],
+            },
+        { duration: duration(currentOptions.closeDuration ?? 220), easing },
       );
       const animations = [surface];
 
-      if (elements.backdrop) {
-        animations.push(
-          animation.animate(
-            elements.backdrop,
-            { opacity: [0, 1] },
-            { duration: duration(options.openDuration ?? 320), easing },
-          ),
-        );
+      if (reduceMotion) {
+        elements.main.style.opacity = "0";
+      } else {
+        elements.main.style.transform = `translateY(${currentHeight}px)`;
       }
-
-      runAnimations(animations, () => {
-        if (isModal) focusSheet();
-        controller.settle();
-      });
-    } else if (snapshot.status === "closing") {
-      const surface = animation.animate(
-        elements.main,
-        {
-          transform: [
-            elements.main.style.transform || "translateY(0px)",
-            `translateY(${currentHeight + readOption(options.bottomInset, 0)}px)`,
-          ],
-        },
-        { duration: duration(options.closeDuration ?? 240), easing },
-      );
-      const animations = [surface];
-
-      elements.main.style.transform = `translateY(${currentHeight}px)`;
 
       if (elements.backdrop) {
         animations.push(
           animation.animate(
             elements.backdrop,
             { opacity: [1, 0] },
-            { duration: duration(options.closeDuration ?? 240), easing },
+            { duration: duration(currentOptions.closeDuration ?? 220), easing },
           ),
         );
       }
@@ -348,12 +419,35 @@ export function bindBottomSheetToDom(
   };
 
   const handleControllerEvent = (
-    _snapshot: ReturnType<BottomSheetController["getSnapshot"]>,
-    event: BottomSheetEvent,
+    _snapshot: ReturnType<ShellSheetController["getSnapshot"]>,
+    event: ShellSheetEvent,
   ): void => {
     if (event.type === "settled" && event.status === "closed") {
       updateAttributes();
       hideOverlay();
+      return;
+    }
+
+    if (event.type === "settled" && event.status === "open") {
+      // Content can change in the same render that requests a new snap point.
+      // The request may be observed before the framework commits that content,
+      // so resolve once more after settling and correct the measured height
+      // with a short, interruptible transition instead of a visible jump.
+      const previousHeight = currentHeight;
+      refreshMeasurements();
+      const measuredHeight = currentHeight;
+
+      if (Math.abs(measuredHeight - previousHeight) > 0.5) {
+        currentHeight = previousHeight;
+        elements.main.style.height = `${previousHeight}px`;
+        elements.root.style.setProperty(
+          "--shell-sheet-height",
+          `${previousHeight}px`,
+        );
+        animateHeight(measuredHeight, false);
+      }
+
+      updateAttributes();
       return;
     }
 
@@ -450,13 +544,13 @@ export function bindBottomSheetToDom(
     const nextHeight = clampSheetHeight(
       pointer.startHeight - offset,
       resolvedSnapPoints,
-      options.rubberBand ?? 0.18,
+      currentOptions.rubberBand ?? 0.18,
     );
 
     currentHeight = nextHeight;
     elements.main.style.height = `${nextHeight}px`;
     elements.root.style.setProperty(
-      "--bottom-sheet-height",
+      "--shell-sheet-height",
       `${nextHeight}px`,
     );
     controller.updateDrag(offset);
@@ -542,23 +636,59 @@ export function bindBottomSheetToDom(
     if (next) controller.snapTo(next.id);
   };
 
-  elements.main.setAttribute("role", "dialog");
-  elements.root.dataset.modality = modality;
-  elements.main.dataset.draggable = String(draggable);
-  if (isModal) elements.main.setAttribute("aria-modal", "true");
-  else elements.main.removeAttribute("aria-modal");
-  if (!elements.main.hasAttribute("tabindex")) elements.main.tabIndex = -1;
-  if (draggable) elements.handle?.style.setProperty("touch-action", "none");
+  const applyRuntimeOptions = (nextOptions: ShellSheetDomOptions): void => {
+    currentOptions = nextOptions;
+    animation = nextOptions.animation ?? nativeAnimation;
+    easing = nextOptions.easing ?? ([0.32, 0.72, 0, 1] as const);
+    modality = nextOptions.modality ?? "modal";
+    isModal = modality === "modal";
+    draggable = nextOptions.draggable ?? true;
+    velocityThreshold = nextOptions.velocityThreshold ?? 700;
+    closeOnBackdrop = nextOptions.closeOnBackdrop ?? isModal;
+    closeOnEscape = nextOptions.closeOnEscape ?? true;
+    dismissOnDragDown = nextOptions.dismissOnDragDown ?? draggable;
+    dismissDistanceRatio = nextOptions.dismissDistanceRatio ?? 0.25;
+    lockScrollEnabled = nextOptions.lockScroll ?? isModal;
+    trapFocus = nextOptions.trapFocus ?? isModal;
+    restoreFocus = nextOptions.restoreFocus ?? isModal;
+    reducedMotionSetting = nextOptions.reducedMotion ?? "media";
 
-  refreshMeasurements();
+    elements.root.dataset.modality = modality;
+    elements.main.dataset.draggable = String(draggable);
+    if (isModal) elements.main.setAttribute("aria-modal", "true");
+    else elements.main.removeAttribute("aria-modal");
+
+    if (draggable) {
+      elements.handle?.style.setProperty("touch-action", "none");
+    } else {
+      elements.handle?.style.removeProperty("touch-action");
+      if (controller.getSnapshot().dragging) controller.cancelDrag();
+    }
+
+    if (controller.getSnapshot().open) {
+      if (lockScrollEnabled) lockPage();
+      else scrollLockCleanup?.();
+
+      if (isModal) makeBackgroundInert();
+      else inertCleanup?.();
+    }
+
+    refreshMeasurements();
+    updateAttributes();
+  };
+
+  elements.main.setAttribute("role", "dialog");
+  if (!elements.main.hasAttribute("tabindex")) elements.main.tabIndex = -1;
+  applyRuntimeOptions(options);
   const initialSnapshot = controller.getSnapshot();
-  elements.root.hidden = !initialSnapshot.open;
-  elements.main.style.transform = initialSnapshot.open
-    ? "translateY(0px)"
-    : `translateY(${currentHeight}px)`;
+  elements.root.hidden = initialSnapshot.status === "closed";
+  elements.main.style.transform =
+    initialSnapshot.status === "closed"
+      ? `translateY(${currentHeight}px)`
+      : "translateY(0px)";
   updateAttributes();
 
-  if (initialSnapshot.open) {
+  if (initialSnapshot.status !== "closed") {
     lockPage();
     makeBackgroundInert();
   }
@@ -580,9 +710,31 @@ export function bindBottomSheetToDom(
   viewport?.addEventListener("resize", refreshMeasurements);
   viewport?.addEventListener("scroll", refreshMeasurements);
 
+  // A framework adapter can be replaced while a controller transition is in
+  // flight. Resume that lifecycle instead of displaying the target state
+  // instantly and leaving the controller stuck in `opening` or `closing`.
+  if (
+    initialSnapshot.status === "opening" ||
+    initialSnapshot.status === "closing"
+  ) {
+    const state = {
+      open: initialSnapshot.open,
+      snapPoint: initialSnapshot.snapPoint,
+    };
+    animateState({
+      type: "state-synced",
+      state,
+      previous: { ...state, open: !state.open },
+    });
+  } else if (initialSnapshot.status === "snapping") {
+    refreshMeasurements();
+    controller.settle();
+  }
+
   return {
     controller,
     elements,
+    updateOptions: applyRuntimeOptions,
     refresh: refreshMeasurements,
     getResolvedSnapPoints: () => resolvedSnapPoints,
     destroy() {

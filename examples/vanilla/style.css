@@ -117,7 +117,7 @@ p {
 }
 
 .sheet-content {
-  max-height: calc(var(--bottom-sheet-height) - 36px);
+  max-height: calc(var(--shell-sheet-height) - 36px);
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 18px 22px max(24px, env(safe-area-inset-bottom));

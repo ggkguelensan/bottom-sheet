@@ -4,6 +4,7 @@
     { "path": "./packages/core" },
     { "path": "./packages/dom" },
     { "path": "./packages/motion" },
-    { "path": "./packages/effector" }
+    { "path": "./packages/effector" },
+    { "path": "./packages/react" }
   ]
 }

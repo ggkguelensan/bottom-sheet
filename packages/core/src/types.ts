@@ -1,34 +1,34 @@
-export type BottomSheetCloseReason =
+export type ShellSheetCloseReason =
   | "api"
   | "backdrop"
   | "escape"
   | "gesture"
   | (string & {});
 
-export type BottomSheetStatus =
+export type ShellSheetStatus =
   | "closed"
   | "opening"
   | "open"
   | "snapping"
   | "closing";
 
-export type BottomSheetSnapPointSize =
+export type ShellSheetSnapPointSize =
   | { type: "ratio"; value: number }
   | { type: "pixels"; value: number }
   | { type: "content"; maxRatio?: number };
 
-export interface BottomSheetSnapPoint {
+export interface ShellSheetSnapPoint {
   id: string;
-  size: BottomSheetSnapPointSize;
+  size: ShellSheetSnapPointSize;
 }
 
-export interface ResolvedBottomSheetSnapPoint {
+export interface ResolvedShellSheetSnapPoint {
   id: string;
   height: number;
   offset: number;
 }
 
-export interface BottomSheetMetrics {
+export interface ShellSheetMetrics {
   viewportHeight: number;
   contentHeight: number;
   topInset?: number;
@@ -38,26 +38,26 @@ export interface BottomSheetMetrics {
   maxHeight?: number;
 }
 
-export interface BottomSheetControlledState {
+export interface ShellSheetControlledState {
   open: boolean;
   snapPoint: string;
 }
 
-export interface BottomSheetSnapshot extends BottomSheetControlledState {
-  status: BottomSheetStatus;
+export interface ShellSheetSnapshot extends ShellSheetControlledState {
+  status: ShellSheetStatus;
   dragging: boolean;
   dragOffset: number;
   sequence: number;
 }
 
-export type BottomSheetEvent =
+export type ShellSheetEvent =
   | { type: "open-requested" }
-  | { type: "close-requested"; reason: BottomSheetCloseReason }
+  | { type: "close-requested"; reason: ShellSheetCloseReason }
   | { type: "snap-requested"; snapPoint: string }
   | {
       type: "state-synced";
-      state: BottomSheetControlledState;
-      previous: BottomSheetControlledState;
+      state: ShellSheetControlledState;
+      previous: ShellSheetControlledState;
     }
   | { type: "settled"; status: "open" | "closed" }
   | { type: "drag-started" }
@@ -66,25 +66,25 @@ export type BottomSheetEvent =
   | { type: "drag-cancelled" }
   | { type: "destroyed" };
 
-export type BottomSheetListener = (
-  snapshot: Readonly<BottomSheetSnapshot>,
-  event: BottomSheetEvent,
+export type ShellSheetListener = (
+  snapshot: Readonly<ShellSheetSnapshot>,
+  event: ShellSheetEvent,
 ) => void;
 
-export interface BottomSheetControllerOptions {
-  snapPoints: readonly BottomSheetSnapPoint[];
-  initialState?: Partial<BottomSheetControlledState>;
+export interface ShellSheetControllerOptions {
+  snapPoints: readonly ShellSheetSnapPoint[];
+  initialState?: Partial<ShellSheetControlledState>;
   controlled?: boolean;
 }
 
-export interface BottomSheetController {
+export interface ShellSheetController {
   open(): void;
-  close(reason?: BottomSheetCloseReason): void;
+  close(reason?: ShellSheetCloseReason): void;
   toggle(): void;
   snapTo(snapPoint: string): void;
 
   /** Applies authoritative state from an external store. */
-  sync(state: BottomSheetControlledState): void;
+  sync(state: ShellSheetControlledState): void;
 
   /** Marks the current opening, closing, or snapping animation as complete. */
   settle(): void;
@@ -94,9 +94,9 @@ export interface BottomSheetController {
   endDrag(velocityY: number): void;
   cancelDrag(): void;
 
-  getSnapshot(): Readonly<BottomSheetSnapshot>;
-  getSnapPoints(): readonly BottomSheetSnapPoint[];
-  subscribe(listener: BottomSheetListener): () => void;
+  getSnapshot(): Readonly<ShellSheetSnapshot>;
+  getSnapPoints(): readonly ShellSheetSnapPoint[];
+  subscribe(listener: ShellSheetListener): () => void;
   destroy(): void;
 }
 
@@ -104,6 +104,6 @@ export interface SelectSnapPointOptions {
   currentHeight: number;
   currentSnapPoint: string;
   velocityY: number;
-  snapPoints: readonly ResolvedBottomSheetSnapPoint[];
+  snapPoints: readonly ResolvedShellSheetSnapPoint[];
   velocityThreshold?: number;
 }

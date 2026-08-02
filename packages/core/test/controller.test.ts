@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { createBottomSheetController } from "../src/index.js";
+import { createShellSheetController } from "../src/index.js";
 
 const snapPoints = [
   { id: "collapsed", size: { type: "ratio", value: 0.6 } },
   { id: "expanded", size: { type: "ratio", value: 0.996 } },
 ] as const;
 
-describe("createBottomSheetController", () => {
+describe("createShellSheetController", () => {
   it("owns state in uncontrolled mode", () => {
-    const controller = createBottomSheetController({ snapPoints });
+    const controller = createShellSheetController({ snapPoints });
     const events: string[] = [];
     controller.subscribe((_snapshot, event) => events.push(event.type));
 
@@ -39,7 +39,7 @@ describe("createBottomSheetController", () => {
   });
 
   it("publishes intent without mutating controlled state", () => {
-    const controller = createBottomSheetController({
+    const controller = createShellSheetController({
       snapPoints,
       controlled: true,
     });
@@ -63,14 +63,14 @@ describe("createBottomSheetController", () => {
   });
 
   it("rejects unknown snap points", () => {
-    const controller = createBottomSheetController({ snapPoints });
+    const controller = createShellSheetController({ snapPoints });
     expect(() => controller.snapTo("missing")).toThrow(
       "Unknown snap point: missing",
     );
   });
 
   it("tracks ephemeral drag state separately", () => {
-    const controller = createBottomSheetController({
+    const controller = createShellSheetController({
       snapPoints,
       initialState: { open: true },
     });

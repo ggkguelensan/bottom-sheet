@@ -1,24 +1,24 @@
 import { assertSnapPoints } from "./snap-points.js";
 import type {
-  BottomSheetCloseReason,
-  BottomSheetControlledState,
-  BottomSheetController,
-  BottomSheetControllerOptions,
-  BottomSheetEvent,
-  BottomSheetListener,
-  BottomSheetSnapshot,
+  ShellSheetCloseReason,
+  ShellSheetControlledState,
+  ShellSheetController,
+  ShellSheetControllerOptions,
+  ShellSheetEvent,
+  ShellSheetListener,
+  ShellSheetSnapshot,
 } from "./types.js";
 
 const controlledStateFromSnapshot = (
-  snapshot: BottomSheetSnapshot,
-): BottomSheetControlledState => ({
+  snapshot: ShellSheetSnapshot,
+): ShellSheetControlledState => ({
   open: snapshot.open,
   snapPoint: snapshot.snapPoint,
 });
 
-export function createBottomSheetController(
-  options: BottomSheetControllerOptions,
-): BottomSheetController {
+export function createShellSheetController(
+  options: ShellSheetControllerOptions,
+): ShellSheetController {
   assertSnapPoints(options.snapPoints);
 
   const snapPoints = [...options.snapPoints];
@@ -31,7 +31,7 @@ export function createBottomSheetController(
     throw new Error(`Unknown initial snap point: ${initialSnapPoint}`);
   }
 
-  let snapshot: BottomSheetSnapshot = {
+  let snapshot: ShellSheetSnapshot = {
     open: options.initialState?.open ?? false,
     status: options.initialState?.open ? "open" : "closed",
     snapPoint: initialSnapPoint,
@@ -40,21 +40,21 @@ export function createBottomSheetController(
     sequence: 0,
   };
   let destroyed = false;
-  const listeners = new Set<BottomSheetListener>();
+  const listeners = new Set<ShellSheetListener>();
 
   const ensureActive = (): void => {
     if (destroyed) {
-      throw new Error("BottomSheet controller has been destroyed.");
+      throw new Error("ShellSheet controller has been destroyed.");
     }
   };
 
-  const publish = (event: BottomSheetEvent): void => {
+  const publish = (event: ShellSheetEvent): void => {
     for (const listener of [...listeners]) {
       listener(snapshot, event);
     }
   };
 
-  const sync = (state: BottomSheetControlledState): void => {
+  const sync = (state: ShellSheetControlledState): void => {
     ensureActive();
 
     if (!snapPointIds.has(state.snapPoint)) {
@@ -101,7 +101,7 @@ export function createBottomSheetController(
     }
   };
 
-  const requestClose = (reason: BottomSheetCloseReason = "api"): void => {
+  const requestClose = (reason: ShellSheetCloseReason = "api"): void => {
     ensureActive();
     publish({ type: "close-requested", reason });
 
@@ -124,7 +124,7 @@ export function createBottomSheetController(
     }
   };
 
-  const controller: BottomSheetController = {
+  const controller: ShellSheetController = {
     open: requestOpen,
     close: requestClose,
     toggle() {

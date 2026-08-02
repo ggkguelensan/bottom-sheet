@@ -1,23 +1,35 @@
-# Adaptive Bottom Sheet
+# Shell Sheet
 
-A framework-agnostic TypeScript bottom-sheet engine. React is intentionally not
-part of the first implementation.
+A framework-agnostic TypeScript shell-sheet engine with optional DOM, Motion,
+Effector and React adapters.
 
-The product motivation and widget scenario matrix are documented in
-[`docs/product-design.md`](./docs/product-design.md).
+## Specification source of truth
+
+[`specs/README.md`](./specs/README.md) is the single normative source of truth
+for repository structure, architecture, module contracts and release gates.
+Changes follow `spec → tests → implementation → demo evidence`.
+
+- [Architecture and transition protocol](./specs/architecture.md)
+- [Repository structure and dependency boundaries](./specs/repository-structure.md)
+- [Module specifications](./specs/modules)
+- [Lovecraft conformance demo](./specs/examples/lovecraft.md)
+- [Quality and release gates](./specs/quality.md)
+
+Files in `docs/` are non-normative guides or compatibility links.
 
 ## Packages
 
 | Package | Responsibility | Runtime dependencies |
 | --- | --- | --- |
-| `@adaptive-bottom-sheet/core` | Controller, controlled/uncontrolled state, snap algorithms | none |
-| `@adaptive-bottom-sheet/dom` | DOM measurement, pointer gestures, viewport, focus, inert, scroll lock | core |
-| `@adaptive-bottom-sheet/motion` | Animation driver using `motion/mini` | dom, motion |
-| `@adaptive-bottom-sheet/effector` | Optional direct controlled binding | core; Effector peer |
+| `@shell-sheet/core` | Controller, controlled/uncontrolled state, snap algorithms | none |
+| `@shell-sheet/dom` | DOM measurement, pointer gestures, viewport, focus, inert, scroll lock | core |
+| `@shell-sheet/motion` | Animation driver using `motion/mini` | dom, motion |
+| `@shell-sheet/effector` | Optional direct controlled binding | core; Effector peer |
+| `@shell-sheet/react` | Thin portal/refs adapter and measured keyed-content transitions | core, dom; React peers |
 
 There is no `motion/react` import anywhere in the repository. The Motion driver
-imports only `animate` from `motion/mini`. A future React package should remain a
-thin DOM/refs adapter over the same controller.
+imports only `animate` from `motion/mini`. The React adapter remains a thin
+DOM/refs layer over the same controller.
 
 ## Architecture
 
@@ -37,18 +49,18 @@ application store.
 ## Vanilla DOM + Motion
 
 ```ts
-import { createBottomSheetController } from "@adaptive-bottom-sheet/core";
-import { bindBottomSheetToDom } from "@adaptive-bottom-sheet/dom";
-import { createMotionAnimationDriver } from "@adaptive-bottom-sheet/motion";
+import { createShellSheetController } from "@shell-sheet/core";
+import { bindShellSheetToDom } from "@shell-sheet/dom";
+import { createMotionAnimationDriver } from "@shell-sheet/motion";
 
-const controller = createBottomSheetController({
+const controller = createShellSheetController({
   snapPoints: [
     { id: "collapsed", size: { type: "ratio", value: 0.6 } },
     { id: "expanded", size: { type: "ratio", value: 0.996 } },
   ],
 });
 
-const binding = bindBottomSheetToDom(
+const binding = bindShellSheetToDom(
   controller,
   {
     root: document.querySelector("#sheet-root")!,
@@ -75,13 +87,13 @@ not wanted.
 For the content-sized, non-draggable widget variant use one content snap point:
 
 ```ts
-const controller = createBottomSheetController({
+const controller = createShellSheetController({
   snapPoints: [
     { id: "content", size: { type: "content", maxRatio: 0.996 } },
   ],
 });
 
-bindBottomSheetToDom(controller, elements, {
+bindShellSheetToDom(controller, elements, {
   modality: "non-modal", // use "modal" to lock and inert the background
   draggable: false,
   animation: createMotionAnimationDriver(),
@@ -95,10 +107,10 @@ publish intent and do not mutate stable state. The Effector model processes that
 intent and sends authoritative state back through `controller.sync()`.
 
 ```ts
-import { createBottomSheetController } from "@adaptive-bottom-sheet/core";
-import { createBottomSheetBinding } from "@adaptive-bottom-sheet/effector";
+import { createShellSheetController } from "@shell-sheet/core";
+import { createShellSheetBinding } from "@shell-sheet/effector";
 
-const controller = createBottomSheetController({
+const controller = createShellSheetController({
   controlled: true,
   snapPoints: [
     { id: "collapsed", size: { type: "ratio", value: 0.6 } },
@@ -106,7 +118,7 @@ const controller = createBottomSheetController({
   ],
 });
 
-const sheet = createBottomSheetBinding({
+const sheet = createShellSheetBinding({
   initialState: { open: false, snapPoint: "collapsed" },
   validateState: ({ snapPoint }) =>
     snapPoint === "collapsed" || snapPoint === "expanded",
@@ -124,16 +136,28 @@ controller.close("gesture"); // request → Effector → sync({ open: false })
 `controllerAttached`, `controllerDetached`, and `controllerEventReceived`
 events with `scopeBind`.
 
+## React + Effector demo
+
+The subject-independent library is exercised by a subject-specific Lovecraft
+atlas in [`examples/lovecraft-react`](./examples/lovecraft-react). It covers
+measured content changes, internal scrolling, compact/expanded content,
+edge-to-edge media, drag snapping and live `sheet ↔ dialog` presentation.
+
+```sh
+npm run dev:lovecraft
+```
+
+The example owns all location/screen types and CSS theme tokens. No demo domain
+is exported by a library package.
+
 ## Development
 
 ```sh
 npm install
 npm run typecheck
+npm run typecheck:demo
 npm test
 npm run build
+npm run build:lovecraft
 npm run dev:vanilla
 ```
-
-The future React adapter must not duplicate the snap algorithm, gesture engine,
-viewport handling, or Effector integration. It should render the compound DOM
-structure, bind element refs, and expose the existing controller as its API ref.

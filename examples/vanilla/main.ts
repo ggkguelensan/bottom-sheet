@@ -1,19 +1,19 @@
-import { createBottomSheetController } from "@adaptive-bottom-sheet/core";
-import { bindBottomSheetToDom } from "@adaptive-bottom-sheet/dom";
-import { createBottomSheetBinding } from "@adaptive-bottom-sheet/effector";
-import { createMotionAnimationDriver } from "@adaptive-bottom-sheet/motion";
+import { createShellSheetController } from "@shell-sheet/core";
+import { bindShellSheetToDom } from "@shell-sheet/dom";
+import { createShellSheetBinding } from "@shell-sheet/effector";
+import { createMotionAnimationDriver } from "@shell-sheet/motion";
 
 const snapPoints = [
   { id: "collapsed", size: { type: "ratio", value: 0.6 } },
   { id: "expanded", size: { type: "ratio", value: 0.996 } },
 ] as const;
 
-const controller = createBottomSheetController({
+const controller = createShellSheetController({
   controlled: true,
   snapPoints,
 });
 
-const sheet = createBottomSheetBinding({
+const sheet = createShellSheetBinding({
   initialState: { open: false, snapPoint: "collapsed" },
   validateState: ({ snapPoint }) =>
     snapPoints.some((point) => point.id === snapPoint),
@@ -23,7 +23,7 @@ const detachEffector = sheet.attach(controller);
 const app = document.querySelector<HTMLElement>("#app")!;
 const main = document.querySelector<HTMLElement>("#sheet-main")!;
 
-const domBinding = bindBottomSheetToDom(
+const domBinding = bindShellSheetToDom(
   controller,
   {
     root: document.querySelector<HTMLElement>("#sheet-root")!,

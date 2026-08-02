@@ -1,47 +1,47 @@
 import type {
-  BottomSheetCloseReason,
-  BottomSheetControlledState,
-  BottomSheetController,
-  BottomSheetEvent,
-  BottomSheetSnapshot,
-} from "@adaptive-bottom-sheet/core";
+  ShellSheetCloseReason,
+  ShellSheetControlledState,
+  ShellSheetController,
+  ShellSheetEvent,
+  ShellSheetSnapshot,
+} from "@shell-sheet/core";
 import type {
   Effect,
   EventCallable,
   Store,
 } from "effector";
 
-export interface BottomSheetControllerEventPayload {
-  controller: BottomSheetController;
-  snapshot: Readonly<BottomSheetSnapshot>;
-  event: BottomSheetEvent;
+export interface ShellSheetControllerEventPayload {
+  controller: ShellSheetController;
+  snapshot: Readonly<ShellSheetSnapshot>;
+  event: ShellSheetEvent;
 }
 
-export interface BottomSheetEffectorOptions {
-  initialState: BottomSheetControlledState;
-  validateState?: (state: BottomSheetControlledState) => boolean;
+export interface ShellSheetEffectorOptions {
+  initialState: ShellSheetControlledState;
+  validateState?: (state: ShellSheetControlledState) => boolean;
 }
 
-export interface BottomSheetEffectorBinding {
-  readonly $state: Store<BottomSheetControlledState>;
+export interface ShellSheetEffectorBinding {
+  readonly $state: Store<ShellSheetControlledState>;
   readonly $open: Store<boolean>;
   readonly $snapPoint: Store<string>;
-  readonly $controller: Store<BottomSheetController | null>;
-  readonly $snapshot: Store<Readonly<BottomSheetSnapshot> | null>;
-  readonly $lastCloseReason: Store<BottomSheetCloseReason | null>;
+  readonly $controller: Store<ShellSheetController | null>;
+  readonly $snapshot: Store<Readonly<ShellSheetSnapshot> | null>;
+  readonly $lastCloseReason: Store<ShellSheetCloseReason | null>;
 
   readonly openRequested: EventCallable<void>;
-  readonly closeRequested: EventCallable<BottomSheetCloseReason | void>;
+  readonly closeRequested: EventCallable<ShellSheetCloseReason | void>;
   readonly snapRequested: EventCallable<string>;
-  readonly stateReplaced: EventCallable<BottomSheetControlledState>;
+  readonly stateReplaced: EventCallable<ShellSheetControlledState>;
 
-  readonly controllerAttached: EventCallable<BottomSheetController>;
+  readonly controllerAttached: EventCallable<ShellSheetController>;
   readonly controllerDetached: EventCallable<void>;
-  readonly controllerEventReceived: EventCallable<BottomSheetControllerEventPayload>;
+  readonly controllerEventReceived: EventCallable<ShellSheetControllerEventPayload>;
   readonly syncControllerFx: Effect<
     {
-      controller: BottomSheetController;
-      state: BottomSheetControlledState;
+      controller: ShellSheetController;
+      state: ShellSheetControlledState;
     },
     void,
     Error
@@ -52,5 +52,5 @@ export interface BottomSheetEffectorBinding {
    * This helper targets the global Effector scope. In forked scopes, bind the
    * exposed events with `scopeBind` and manage the subscription explicitly.
    */
-  attach(controller: BottomSheetController): () => void;
+  attach(controller: ShellSheetController): () => void;
 }

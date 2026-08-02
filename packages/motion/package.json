@@ -1,7 +1,7 @@
 {
-  "name": "@adaptive-bottom-sheet/motion",
+  "name": "@shell-sheet/motion",
   "version": "0.1.0",
-  "description": "motion/mini animation driver for adaptive bottom sheets.",
+  "description": "motion/mini animation driver for Shell Sheet.",
   "type": "module",
   "sideEffects": false,
   "files": ["dist"],
@@ -12,7 +12,7 @@
     }
   },
   "dependencies": {
-    "@adaptive-bottom-sheet/dom": "0.1.0",
+    "@shell-sheet/dom": "0.1.0",
     "motion": "^12.43.0"
   },
   "scripts": {

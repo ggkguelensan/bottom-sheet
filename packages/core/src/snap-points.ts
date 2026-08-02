@@ -1,7 +1,7 @@
 import type {
-  BottomSheetMetrics,
-  BottomSheetSnapPoint,
-  ResolvedBottomSheetSnapPoint,
+  ShellSheetMetrics,
+  ShellSheetSnapPoint,
+  ResolvedShellSheetSnapPoint,
   SelectSnapPointOptions,
 } from "./types.js";
 
@@ -9,21 +9,21 @@ const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
 export function assertSnapPoints(
-  snapPoints: readonly BottomSheetSnapPoint[],
+  snapPoints: readonly ShellSheetSnapPoint[],
 ): void {
   if (snapPoints.length === 0) {
-    throw new Error("BottomSheet requires at least one snap point.");
+    throw new Error("ShellSheet requires at least one snap point.");
   }
 
   const ids = new Set<string>();
 
   for (const point of snapPoints) {
     if (!point.id.trim()) {
-      throw new Error("BottomSheet snap point ids must not be empty.");
+      throw new Error("ShellSheet snap point ids must not be empty.");
     }
 
     if (ids.has(point.id)) {
-      throw new Error(`Duplicate BottomSheet snap point id: ${point.id}`);
+      throw new Error(`Duplicate ShellSheet snap point id: ${point.id}`);
     }
 
     ids.add(point.id);
@@ -49,9 +49,9 @@ export function assertSnapPoints(
 }
 
 export function resolveSnapPoints(
-  snapPoints: readonly BottomSheetSnapPoint[],
-  metrics: BottomSheetMetrics,
-): ResolvedBottomSheetSnapPoint[] {
+  snapPoints: readonly ShellSheetSnapPoint[],
+  metrics: ShellSheetMetrics,
+): ResolvedShellSheetSnapPoint[] {
   assertSnapPoints(snapPoints);
 
   const topInset = metrics.topInset ?? 0;
@@ -107,7 +107,7 @@ export function selectSnapPoint({
   velocityY,
   snapPoints,
   velocityThreshold = 700,
-}: SelectSnapPointOptions): ResolvedBottomSheetSnapPoint {
+}: SelectSnapPointOptions): ResolvedShellSheetSnapPoint {
   if (snapPoints.length === 0) {
     throw new Error("Cannot select a snap point from an empty list.");
   }
@@ -153,7 +153,7 @@ export function selectSnapPoint({
 
 export function clampSheetHeight(
   height: number,
-  snapPoints: readonly ResolvedBottomSheetSnapPoint[],
+  snapPoints: readonly ResolvedShellSheetSnapPoint[],
   rubberBand = 0,
 ): number {
   if (snapPoints.length === 0) {

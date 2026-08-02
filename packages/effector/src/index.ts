@@ -1,6 +1,6 @@
-export { createBottomSheetBinding } from "./create-binding.js";
+export { createShellSheetBinding } from "./create-binding.js";
 export type {
-  BottomSheetControllerEventPayload,
-  BottomSheetEffectorBinding,
-  BottomSheetEffectorOptions,
+  ShellSheetControllerEventPayload,
+  ShellSheetEffectorBinding,
+  ShellSheetEffectorOptions,
 } from "./types.js";

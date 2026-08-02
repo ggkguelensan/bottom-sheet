@@ -1,7 +1,7 @@
 {
-  "name": "@adaptive-bottom-sheet/effector",
+  "name": "@shell-sheet/effector",
   "version": "0.1.0",
-  "description": "Optional direct Effector binding for the adaptive bottom sheet controller.",
+  "description": "Optional direct Effector binding for the Shell Sheet controller.",
   "type": "module",
   "sideEffects": false,
   "files": ["dist"],
@@ -12,7 +12,7 @@
     }
   },
   "dependencies": {
-    "@adaptive-bottom-sheet/core": "0.1.0"
+    "@shell-sheet/core": "0.1.0"
   },
   "peerDependencies": {
     "effector": ">=23.0.0"

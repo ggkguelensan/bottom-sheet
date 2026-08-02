@@ -1,19 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { createBottomSheetController } from "@adaptive-bottom-sheet/core";
-import { createBottomSheetBinding } from "../src/index.js";
+import { createShellSheetController } from "@shell-sheet/core";
+import { createShellSheetBinding } from "../src/index.js";
 
 const snapPoints = [
   { id: "collapsed", size: { type: "ratio", value: 0.6 } },
   { id: "expanded", size: { type: "ratio", value: 0.996 } },
 ] as const;
 
-describe("createBottomSheetBinding", () => {
+describe("createShellSheetBinding", () => {
   it("keeps Effector as the source of controlled state", () => {
-    const controller = createBottomSheetController({
+    const controller = createShellSheetController({
       snapPoints,
       controlled: true,
     });
-    const binding = createBottomSheetBinding({
+    const binding = createShellSheetBinding({
       initialState: { open: false, snapPoint: "collapsed" },
       validateState: ({ snapPoint }) =>
         snapPoints.some((point) => point.id === snapPoint),
@@ -40,12 +40,12 @@ describe("createBottomSheetBinding", () => {
   });
 
   it("forwards component close requests and their reason", () => {
-    const controller = createBottomSheetController({
+    const controller = createShellSheetController({
       snapPoints,
       controlled: true,
       initialState: { open: true },
     });
-    const binding = createBottomSheetBinding({
+    const binding = createShellSheetBinding({
       initialState: { open: true, snapPoint: "collapsed" },
     });
     binding.attach(controller);
@@ -57,7 +57,7 @@ describe("createBottomSheetBinding", () => {
   });
 
   it("rejects invalid external snap state", () => {
-    const binding = createBottomSheetBinding({
+    const binding = createShellSheetBinding({
       initialState: { open: false, snapPoint: "collapsed" },
       validateState: ({ snapPoint }) => snapPoint !== "missing",
     });

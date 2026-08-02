@@ -1,5 +1,5 @@
 {
-  "name": "adaptive-bottom-sheet-workspace",
+  "name": "shell-sheet-workspace",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -8,16 +8,24 @@
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b --pretty false",
+    "typecheck:demo": "tsc -p examples/lovecraft-react/tsconfig.json --pretty false",
     "test": "vitest run",
     "test:watch": "vitest",
     "dev:vanilla": "vite examples/vanilla",
+    "dev:lovecraft": "vite examples/lovecraft-react",
+    "build:lovecraft": "vite build examples/lovecraft-react",
     "clean": "tsc -b --clean"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@types/react": "^19.1.9",
+    "@types/react-dom": "^19.1.7",
     "effector": "^23.4.4",
+    "effector-react": "^23.3.0",
     "jsdom": "^29.1.1",
     "motion": "^12.43.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
     "typescript": "^7.0.2",
     "vite": "^8.2.0",
     "vitest": "^4.1.10"

@@ -1,55 +1,61 @@
 import type {
-  BottomSheetController,
-  ResolvedBottomSheetSnapPoint,
-} from "@adaptive-bottom-sheet/core";
+  ShellSheetController,
+  ResolvedShellSheetSnapPoint,
+} from "@shell-sheet/core";
 
-export type BottomSheetEasing =
+export type ShellSheetEasing =
   | "linear"
   | "easeIn"
   | "easeOut"
   | "easeInOut"
   | readonly [number, number, number, number];
 
-export type BottomSheetKeyframes = Record<
+export type ShellSheetKeyframes = Record<
   string,
   string | number | readonly (string | number)[]
 >;
 
-export interface BottomSheetAnimationOptions {
+export interface ShellSheetAnimationOptions {
   /** Duration in milliseconds. */
   duration: number;
-  easing: BottomSheetEasing;
+  easing: ShellSheetEasing;
 }
 
-export interface BottomSheetAnimationControls {
+export interface ShellSheetAnimationControls {
   finished: Promise<void>;
   stop(): void;
 }
 
-export interface BottomSheetAnimationDriver {
+export interface ShellSheetAnimationDriver {
   animate(
     element: HTMLElement,
-    keyframes: BottomSheetKeyframes,
-    options: BottomSheetAnimationOptions,
-  ): BottomSheetAnimationControls;
+    keyframes: ShellSheetKeyframes,
+    options: ShellSheetAnimationOptions,
+  ): ShellSheetAnimationControls;
 }
 
-export interface BottomSheetElements {
+export interface ShellSheetElements {
   /** Overlay/portal root. It is hidden after the closing animation. */
   root: HTMLElement;
   /** The bottom-anchored sheet surface. */
   main: HTMLElement;
   /** Drag and toggle affordance. */
   handle?: HTMLElement;
+  /** Fixed row at the top of the sheet. Its height is part of content sizing. */
+  header?: HTMLElement;
   /** Element whose scrollHeight represents content height. */
   content?: HTMLElement;
+  /** Fixed row at the bottom of the sheet. Its height is part of content sizing. */
+  footer?: HTMLElement;
+  /** Additional elements that initiate drag without gaining handle click semantics. */
+  dragAreas?: readonly HTMLElement[];
   backdrop?: HTMLElement;
   /** Application region made inert while the sheet is open. */
   inertTarget?: HTMLElement;
 }
 
-export interface BottomSheetDomOptions {
-  animation?: BottomSheetAnimationDriver;
+export interface ShellSheetDomOptions {
+  animation?: ShellSheetAnimationDriver;
   /**
    * Modal sheets lock and inert the background. Non-modal sheets leave the
    * surrounding application interactive and do not steal focus by default.
@@ -60,7 +66,7 @@ export interface BottomSheetDomOptions {
   openDuration?: number;
   closeDuration?: number;
   snapDuration?: number;
-  easing?: BottomSheetEasing;
+  easing?: ShellSheetEasing;
 
   topInset?: number | (() => number);
   bottomInset?: number | (() => number);
@@ -80,10 +86,16 @@ export interface BottomSheetDomOptions {
   reducedMotion?: boolean | "media";
 }
 
-export interface BottomSheetDomBinding {
-  readonly controller: BottomSheetController;
-  readonly elements: BottomSheetElements;
+export interface ShellSheetDomBinding {
+  readonly controller: ShellSheetController;
+  readonly elements: ShellSheetElements;
+  /**
+   * Replaces runtime behaviour without tearing down the DOM binding. This is
+   * the path framework adapters should use for presentation or modality
+   * changes so an in-flight animation and gesture keep their lifecycle.
+   */
+  updateOptions(options: ShellSheetDomOptions): void;
   refresh(): void;
-  getResolvedSnapPoints(): readonly ResolvedBottomSheetSnapPoint[];
+  getResolvedSnapPoints(): readonly ResolvedShellSheetSnapPoint[];
   destroy(): void;
 }

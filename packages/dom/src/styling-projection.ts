@@ -179,6 +179,10 @@ export const projectStableState = <
       "--shell-sheet-target-inline-size",
       `${geometry.currentRect.width}px`,
     );
+    elements.viewport?.style.setProperty(
+      "--drawer-keyboard-inset",
+      `${geometry.keyboardInset}px`,
+    );
   }
 
   const draggable = visualTarget?.draggable === true;

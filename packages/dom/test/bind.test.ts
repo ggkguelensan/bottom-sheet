@@ -86,7 +86,15 @@ class FakeResizeObserver implements ShellSheetResizeObserver {
   };
 }
 
-const createHarness = () => {
+const defaultViewport = Object.freeze({
+  offsetLeft: 0,
+  offsetTop: 0,
+  width: 390,
+  height: 800,
+  scale: 1,
+});
+
+const createHarness = (viewport = defaultViewport) => {
   const frames = new FakeFrames();
   const observer = new FakeResizeObserver();
   const environment: ShellSheetDomEnvironment = {
@@ -94,13 +102,7 @@ const createHarness = () => {
     cancelAnimationFrame: frames.cancel,
     getComputedStyle: (element) => window.getComputedStyle(element),
     createResizeObserver: () => observer,
-    getViewport: () => ({
-      offsetLeft: 0,
-      offsetTop: 0,
-      width: 390,
-      height: 800,
-      scale: 1,
-    }),
+    getViewport: () => viewport,
     observeViewport: () => () => undefined,
     prefersReducedMotion: () => false,
     getDocumentVisibility: () => "visible",
@@ -409,6 +411,33 @@ describe("target DOM binding", () => {
     warning.mockRestore();
   });
 
+  it("projects a VisualViewport keyboard inset without duplicating external insets", async () => {
+    const harness = createHarness({
+      offsetLeft: 0,
+      offsetTop: 80,
+      width: 390,
+      height: 520,
+      scale: 1,
+    });
+    const controller = createShellSheetController<Snap, Region>(closed());
+    const binding = bindShellSheetToDom(controller, {
+      environment: harness.environment,
+      animation: harness.animation,
+      scrollLock: { acquire: () => () => undefined },
+      backgroundIsolation: { acquire: () => () => undefined },
+    });
+    const anatomy = registerAnatomy(binding);
+    binding.setInsets({ top: 12, bottom: 24 });
+
+    controller.sync(opened("keyboard"));
+    await flushAll(harness.frames);
+    expect(
+      anatomy.viewport.style.getPropertyValue("--drawer-keyboard-inset"),
+    ).toBe("200px");
+    expect(Number.parseFloat(anatomy.popup.style.height)).toBeCloseTo(338.8);
+    binding.destroy();
+  });
+
   it("uses a Portal-sibling isolation strategy when no inert target is registered", async () => {
     const harness = createHarness();
     const controller = createShellSheetController<Snap, Region>(closed());
@@ -431,6 +460,59 @@ describe("target DOM binding", () => {
     expect(anatomy.inertTarget.hasAttribute("aria-hidden")).toBe(false);
 
     binding.destroy();
+  });
+
+  it("reference-counts shared modal isolation and restores exact external values", async () => {
+    const harness = createHarness();
+    const firstController = createShellSheetController<Snap, Region>(closed("first:closed"));
+    const secondController = createShellSheetController<Snap, Region>(closed("second:closed"));
+    const firstBinding = bindShellSheetToDom(firstController, {
+      environment: harness.environment,
+      animation: harness.animation,
+    });
+    const secondBinding = bindShellSheetToDom(secondController, {
+      environment: harness.environment,
+      animation: harness.animation,
+    });
+    const first = registerAnatomy(firstBinding);
+    const second = registerAnatomy(secondBinding);
+    first.cleanups[9]?.();
+    second.cleanups[9]?.();
+    const sharedBackground = element("main");
+    sharedBackground.inert = false;
+    sharedBackground.setAttribute("aria-hidden", "external");
+    document.body.append(sharedBackground);
+    firstBinding.registerPart("inert-target", sharedBackground);
+    secondBinding.registerPart("inert-target", sharedBackground);
+    document.body.style.overflow = "clip";
+    document.body.style.paddingRight = "7px";
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+
+    firstController.sync(opened("first:open"));
+    secondController.sync(opened("second:open"));
+    await flushAll(harness.frames);
+    expect(sharedBackground.inert).toBe(true);
+    expect(sharedBackground.getAttribute("aria-hidden")).toBe("true");
+    expect(document.body.style.overflow).toBe("hidden");
+
+    firstController.sync(closed("first:closed:again"));
+    await flushAll(harness.frames);
+    expect(sharedBackground.inert).toBe(true);
+    expect(sharedBackground.getAttribute("aria-hidden")).toBe("true");
+    expect(document.body.style.overflow).toBe("hidden");
+
+    secondController.sync(closed("second:closed:again"));
+    await flushAll(harness.frames);
+    expect(sharedBackground.inert).toBe(false);
+    expect(sharedBackground.getAttribute("aria-hidden")).toBe("external");
+    expect(document.body.style.overflow).toBe("clip");
+    expect(document.body.style.paddingRight).toBe("7px");
+
+    firstBinding.destroy();
+    secondBinding.destroy();
+    scrollTo.mockRestore();
+    document.body.style.overflow = "";
+    document.body.style.paddingRight = "";
   });
 
   it("crossfades only a changed Body while geometry uses the same coordinator", async () => {

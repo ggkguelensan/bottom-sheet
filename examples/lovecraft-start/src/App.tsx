@@ -433,7 +433,16 @@ function ShellSingleton({ state }: Readonly<{ state: DemoState }>) {
             <ShellSheet.Content className={styles.sheetContent}>
               <ShellSheet.Header className={`${styles.sheetHeader} ${state.kind === "antarctica" ? styles.sheetHeaderMedia : ""}`}>
                 <ShellSheet.Handle className={styles.handle}><span /></ShellSheet.Handle>
-                <StateHeader state={state} />
+                {state.kind === "dreamlands" ? (
+                  <ShellSheet.DragArea
+                    className={styles.customDragArea}
+                    data-demo-drag-area=""
+                  >
+                    <StateHeader state={state} />
+                  </ShellSheet.DragArea>
+                ) : (
+                  <StateHeader state={state} />
+                )}
               </ShellSheet.Header>
               <ShellSheet.Body className={styles.sheetBody}>
                 <StateBody state={state} />

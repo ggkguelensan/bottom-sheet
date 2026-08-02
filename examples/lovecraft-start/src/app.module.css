@@ -98,6 +98,7 @@
   .sheetHeading small { display: block; margin-block-start: 9px; color: var(--muted); font: 600 12px ui-monospace, monospace; letter-spacing: .12em; }
   .handle { position: relative; z-index: 4; justify-self: center; width: 64px; height: 40px; margin-block: 0 4px; padding: 0; border: 0; background: transparent; cursor: ns-resize; touch-action: none; }
   .handle span { display: block; width: 48px; height: 6px; margin: auto; border-radius: 999px; background: #53605e; }
+  .customDragArea { cursor: ns-resize; user-select: none; }
   .sheetHeaderMedia { padding: 0; }
   .sheetHeaderMedia .handle { position: absolute; inset-block-start: 2px; inset-inline-start: calc(50% - 32px); }
   .mediaHeading { min-height: 260px; padding: 176px 34px 26px; background-position: center; background-size: cover; }

@@ -9,6 +9,7 @@ declare const styles: Readonly<{
   cardMain: string;
   cardRegion: string;
   cardSignal: string;
+  customDragArea: string;
   dreamMap: string;
   evidenceGrid: string;
   eyebrow: string;

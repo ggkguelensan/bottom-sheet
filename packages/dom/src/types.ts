@@ -169,6 +169,7 @@ export type ShellSheetMeasuredGeometry<TSnap extends string = string> =
     resolvedSnapPoints: readonly ResolvedShellSheetSnapPoint<TSnap>[];
     targetHeight: number;
     currentRect: DOMRectReadOnly;
+    keyboardInset: number;
     headerHeight: number;
     bodyNaturalHeight: number;
     footerHeight: number;

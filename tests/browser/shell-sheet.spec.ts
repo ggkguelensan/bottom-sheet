@@ -56,10 +56,9 @@ const waitForOpen = async (page: Page, kind: string): Promise<Locator> => {
   return current;
 };
 
-const dragHandleUp = async (page: Page): Promise<void> => {
-  const handle = page.getByRole("button", { name: "Expand sheet" });
-  await expect(handle).toBeVisible();
-  const box = await handle.boundingBox();
+const dragAreaUp = async (page: Page, area: Locator): Promise<void> => {
+  await expect(area).toBeVisible();
+  const box = await area.boundingBox();
   if (!box) throw new Error("Shell Sheet Handle has no visual box.");
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
@@ -70,6 +69,34 @@ const dragHandleUp = async (page: Page): Promise<void> => {
     await page.waitForTimeout(24);
   }
   await page.mouse.up();
+};
+
+const dragHandleUp = async (page: Page): Promise<void> =>
+  dragAreaUp(page, page.getByRole("button", { name: "Expand sheet" }));
+
+const beginCapturedHandleDrag = async (
+  page: Page,
+  handle: Locator,
+): Promise<number> => {
+  await handle.evaluate((element) => {
+    delete element.dataset.capturePointerId;
+    element.addEventListener(
+      "gotpointercapture",
+      (event) => {
+        element.dataset.capturePointerId = String((event as PointerEvent).pointerId);
+      },
+      { once: true },
+    );
+  });
+  const box = await handle.boundingBox();
+  if (!box) throw new Error("Shell Sheet Handle has no visual box.");
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x, y - 48, { steps: 4 });
+  await expect(handle).toHaveAttribute("data-capture-pointer-id", /\d+/);
+  return Number(await handle.getAttribute("data-capture-pointer-id"));
 };
 
 test.beforeEach(async ({ page }) => {
@@ -142,7 +169,8 @@ test("Innsmouth and Dreamlands accept one gesture release and keep Footer pinned
   const dreamlands = await waitForOpen(page, "dreamlands");
   await waitForAnimations(dreamlands);
   await expect(page.getByText("Компактный ориентир")).toBeVisible();
-  await dragHandleUp(page);
+  await expect(page.getByRole("button", { name: "Expand sheet" })).toBeVisible();
+  await dragAreaUp(page, page.locator("[data-demo-drag-area]"));
   await expect(page.getByText("Три площадки Кадата")).toBeVisible();
   await expect(page.getByText("Компактный ориентир")).toHaveCount(0);
 });
@@ -196,6 +224,15 @@ test("the same Popup morphs sheet to dialog, applies modality, restores focus, a
   await expect(app).toHaveAttribute("inert", "");
   await waitForAnimations(surface);
 
+  const close = page.getByRole("button", { name: "Закрыть", exact: true });
+  const enter = page.getByRole("button", { name: "Войти в библиотеку", exact: true });
+  await page.keyboard.press("Tab");
+  await expect(close).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(enter).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(close).toBeFocused();
+
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-shell-sheet-portal]")).toBeVisible();
   await expectActiveTransform(surface, "translateY(12px)");
@@ -232,21 +269,30 @@ test("pointer cancellation reconciles mechanics and viewport resize retargets th
   const surface = await waitForOpen(page, "innsmouth");
   await waitForAnimations(surface);
   const handle = page.getByRole("button", { name: "Expand sheet" });
-  await handle.evaluate((element) => {
-    const event = (type: string, y: number) => new PointerEvent(type, {
+  const cancelledPointer = await beginCapturedHandleDrag(page, handle);
+  await expect(surface).toHaveAttribute("data-swiping", "");
+  await handle.evaluate((element, pointerId) => {
+    element.dispatchEvent(new PointerEvent("pointercancel", {
       bubbles: true,
-      cancelable: true,
-      pointerId: 7,
-      pointerType: "touch",
+      pointerId,
+      pointerType: "mouse",
       isPrimary: true,
-      clientX: 20,
-      clientY: y,
-    });
-    element.dispatchEvent(event("pointerdown", 600));
-    element.dispatchEvent(event("pointermove", 540));
-    element.dispatchEvent(event("pointercancel", 540));
-  });
+    }));
+  }, cancelledPointer);
+  await page.mouse.up();
   await expect(surface).not.toHaveAttribute("data-swiping", "");
+  await expect(page.getByRole("button", { name: "Expand sheet" })).toBeVisible();
+
+  const lostPointer = await beginCapturedHandleDrag(page, handle);
+  await expect(surface).toHaveAttribute("data-swiping", "");
+  await handle.evaluate((element, pointerId) => {
+    if (!element.hasPointerCapture(pointerId)) {
+      throw new Error("The accepted gesture did not retain pointer capture.");
+    }
+    element.releasePointerCapture(pointerId);
+  }, lostPointer);
+  await expect(surface).not.toHaveAttribute("data-swiping", "");
+  await page.mouse.up();
   await expect(page.getByRole("button", { name: "Expand sheet" })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 620 });

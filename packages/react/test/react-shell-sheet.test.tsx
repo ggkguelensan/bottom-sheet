@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
 import {
+  Suspense,
   StrictMode,
   act,
   createRef,
+  type ReactNode,
 } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -384,6 +386,142 @@ describe("ShellSheet React adapter", () => {
     await flushVisuals(test.frames);
     expect(portal.querySelectorAll("[data-region='body']")).toHaveLength(1);
     expect(portal.textContent).not.toContain("Arkham");
+  });
+
+  it("keeps the outgoing Body while Suspense provides measurable incoming readiness", async () => {
+    const test = harness();
+    const controller = createShellSheetController<Snap, Region>();
+    let ready = false;
+    let resolve!: () => void;
+    const pending = new Promise<void>((next) => { resolve = next; });
+    const AsyncBody = () => {
+      if (!ready) throw pending;
+      return <>Innsmouth ready</>;
+    };
+    const render = (
+      next: ShellSheetOpenTarget<Snap, Region>,
+      body: ReactNode,
+    ) => (
+      <ShellSheet.Root
+        controller={controller}
+        target={next}
+        environment={test.environment}
+        animation={test.animation}
+      >
+        <ShellSheet.Portal container={portal} keepMounted>
+          <ShellSheet.Backdrop />
+          <ShellSheet.Viewport>
+            <ShellSheet.Popup aria-label="Archive location">
+              <ShellSheet.Content>
+                <ShellSheet.Header><ShellSheet.Title>Archive</ShellSheet.Title></ShellSheet.Header>
+                <ShellSheet.Body>{body}</ShellSheet.Body>
+                <ShellSheet.Footer><ShellSheet.Close>Close</ShellSheet.Close></ShellSheet.Footer>
+              </ShellSheet.Content>
+            </ShellSheet.Popup>
+          </ShellSheet.Viewport>
+        </ShellSheet.Portal>
+      </ShellSheet.Root>
+    );
+
+    await act(async () => root.render(render(target("A"), "Arkham ready")));
+    await flushVisuals(test.frames);
+    await act(async () => root.render(render(
+      target("B", { body: "b" }),
+      <Suspense fallback={<span>Incoming measurable fallback</span>}>
+        <AsyncBody />
+      </Suspense>,
+    )));
+
+    expect(portal.textContent).toContain("Arkham ready");
+    expect(portal.textContent).toContain("Incoming measurable fallback");
+    expect(portal.querySelector("[data-layer='outgoing']")).not.toBeNull();
+
+    ready = true;
+    await act(async () => {
+      resolve();
+      await pending;
+    });
+    expect(portal.textContent).toContain("Arkham ready");
+    expect(portal.textContent).toContain("Innsmouth ready");
+
+    await flushVisuals(test.frames);
+    expect(portal.textContent).not.toContain("Arkham ready");
+    expect(portal.textContent).toContain("Innsmouth ready");
+  });
+
+  it("renders the Base-shaped default anatomy and keeps DragArea pointer-only", async () => {
+    const test = harness();
+    const controller = createShellSheetController<Snap, Region>();
+    const states: unknown[] = [];
+
+    await act(async () => root.render(
+      <ShellSheet.Root
+        controller={controller}
+        target={target("anatomy")}
+        environment={test.environment}
+        animation={test.animation}
+      >
+        <ShellSheet.Trigger data-part="trigger">Open</ShellSheet.Trigger>
+        <ShellSheet.Portal data-part="portal" container={portal} keepMounted>
+          <ShellSheet.Backdrop data-part="backdrop" />
+          <ShellSheet.Viewport data-part="viewport">
+            <ShellSheet.Popup
+              data-part="popup"
+              className={(state) => {
+                states.push(state);
+                return "consumer-popup";
+              }}
+            >
+              <ShellSheet.Content data-part="content">
+                <ShellSheet.Header data-part="header">
+                  <ShellSheet.Handle data-part="handle">Drag</ShellSheet.Handle>
+                  <ShellSheet.DragArea data-part="drag-area">Custom drag chrome</ShellSheet.DragArea>
+                  <ShellSheet.Title data-part="title">Archive</ShellSheet.Title>
+                </ShellSheet.Header>
+                <ShellSheet.Body data-part="body">
+                  <ShellSheet.Description data-part="description">Description</ShellSheet.Description>
+                </ShellSheet.Body>
+                <ShellSheet.Footer data-part="footer">
+                  <ShellSheet.Close data-part="close">Close</ShellSheet.Close>
+                </ShellSheet.Footer>
+              </ShellSheet.Content>
+            </ShellSheet.Popup>
+          </ShellSheet.Viewport>
+        </ShellSheet.Portal>
+      </ShellSheet.Root>,
+    ));
+    await flushVisuals(test.frames);
+
+    const expectedTags = {
+      trigger: "BUTTON",
+      portal: "DIV",
+      backdrop: "DIV",
+      viewport: "DIV",
+      popup: "DIV",
+      content: "DIV",
+      header: "DIV",
+      handle: "BUTTON",
+      "drag-area": "DIV",
+      title: "H2",
+      body: "DIV",
+      description: "P",
+      footer: "DIV",
+      close: "BUTTON",
+    } as const;
+    for (const [part, tag] of Object.entries(expectedTags)) {
+      expect((part === "trigger" ? host : portal).querySelector(`[data-part='${part}']`)?.tagName).toBe(tag);
+    }
+    const popup = portal.querySelector<HTMLElement>("[data-part='popup']")!;
+    expect(popup.dataset.presentation).toBe("sheet");
+    expect(popup.dataset.swipeDirection).toBe("down");
+    expect(popup.hasAttribute("data-open")).toBe(true);
+    expect(popup.hasAttribute("data-expanded")).toBe(false);
+    const dragArea = portal.querySelector<HTMLElement>("[data-part='drag-area']")!;
+    expect(dragArea.getAttribute("role")).toBeNull();
+    expect(dragArea.tabIndex).toBe(-1);
+    expect(dragArea.style.touchAction).toBe("pan-x");
+    expect(states.length).toBeGreaterThan(0);
+    expect(states.every(Object.isFrozen)).toBe(true);
   });
 
   it("composes render handlers consumer-first and honors preventDefault", async () => {

@@ -87,6 +87,11 @@ export function measureTargetGeometry<
     target.regions.body.key,
   )!;
   const viewport = environment.getViewport(portal);
+  const layoutViewportHeight = elements.viewport!.getBoundingClientRect().height;
+  const keyboardInset = Math.max(
+    0,
+    layoutViewportHeight - viewport.offsetTop - viewport.height,
+  );
   const headerHeight = header.getBoundingClientRect().height;
   const bodyNaturalHeight = naturalBodyHeight(bodyLayer);
   const footerHeight = footer.getBoundingClientRect().height;
@@ -110,6 +115,7 @@ export function measureTargetGeometry<
     resolvedSnapPoints,
     targetHeight: selected.height,
     currentRect: popup.getBoundingClientRect(),
+    keyboardInset,
     headerHeight,
     bodyNaturalHeight,
     footerHeight,

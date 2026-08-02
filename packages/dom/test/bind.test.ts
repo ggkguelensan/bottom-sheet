@@ -619,6 +619,31 @@ describe("target DOM binding", () => {
     expect(document.activeElement).toBe(anatomy.popup);
     expect(controller.getSnapshot().settledTarget?.targetId).toBe("B");
 
+    const incomingTransition = harness.calls.find(
+      (call) => call.element === incoming,
+    );
+    expect(incomingTransition).toMatchObject({
+      duration: 220,
+      easing: "cubic-bezier(0.65, 0, 0.35, 1)",
+      keyframes: {
+        opacity: [0, 1],
+        filter: ["blur(2px)", "blur(0px)"],
+        transform: ["translateY(8px)", "translateY(0px)"],
+      },
+    });
+    const outgoingTransition = harness.calls.find(
+      (call) => call.element === anatomy.bodyLayer,
+    );
+    expect(outgoingTransition).toMatchObject({
+      duration: 220,
+      easing: "cubic-bezier(0.65, 0, 0.35, 1)",
+      keyframes: {
+        opacity: [1, 0],
+        filter: ["blur(0px)", "blur(2px)"],
+        transform: ["translateY(0px)", "translateY(-8px)"],
+      },
+    });
+
     binding.destroy();
   });
 
@@ -720,8 +745,11 @@ describe("target DOM binding", () => {
     visibleHeight = 452;
     expect(controller.getSnapshot().settledTarget?.targetId).toBe("A");
 
-    const details = element("div", 500);
-    Object.defineProperty(details, "scrollHeight", { value: 500 });
+    let detailsHeight = 360;
+    const details = element("div", 360);
+    Object.defineProperty(details, "scrollHeight", {
+      get: () => detailsHeight,
+    });
     anatomy.body.append(details);
     binding.registerRegionLayer(
       "body",
@@ -735,6 +763,19 @@ describe("target DOM binding", () => {
     expect(bCalls.length).toBeGreaterThan(0);
 
     visibleHeight = 510;
+    detailsHeight = 500;
+    const bRetargetStart = deferred.length;
+    binding.refresh();
+    await flushAll(harness.frames);
+    const bRetargetCalls = deferred.slice(bRetargetStart);
+    expect(bCalls.every((call) => call.stop.mock.calls.length === 1)).toBe(true);
+    expect(
+      bRetargetCalls.some((call) => call.element === anatomy.bodyLayer),
+    ).toBe(true);
+    expect(
+      bRetargetCalls.some((call) => call.element === details),
+    ).toBe(true);
+
     anatomy.bodyLayer.style.opacity = "0.55";
     anatomy.bodyLayer.style.filter = "blur(0.9px)";
     details.style.opacity = "0.45";
@@ -744,7 +785,9 @@ describe("target DOM binding", () => {
     await flushAll(harness.frames);
     const cCalls = deferred.slice(cStart);
 
-    expect(bCalls.every((call) => call.stop.mock.calls.length === 1)).toBe(true);
+    expect(
+      bRetargetCalls.every((call) => call.stop.mock.calls.length === 1),
+    ).toBe(true);
     const cGeometry = cCalls.find(
       (call) => call.element === anatomy.popup && "height" in call.keyframes,
     );
@@ -757,7 +800,9 @@ describe("target DOM binding", () => {
     expect(restoredSummary?.keyframes).toMatchObject({ opacity: [0.55, 1] });
     const cTransitionId = controller.getSnapshot().transitionId;
 
-    for (const call of bCalls) call.resolve({ status: "finished" });
+    for (const call of [...bCalls, ...bRetargetCalls]) {
+      call.resolve({ status: "finished" });
+    }
     await Promise.resolve();
     await Promise.resolve();
     expect(controller.getSnapshot().transitionId).toBe(cTransitionId);

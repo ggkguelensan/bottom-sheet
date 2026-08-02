@@ -56,6 +56,7 @@ type ActiveAttempt<TSnap extends string, TRegionKey extends string> = {
   readonly transitionId: number;
   readonly targetId: string;
   readonly visualTarget: ShellSheetOpenTarget<TSnap, TRegionKey>;
+  readonly regionSourceTarget: ShellSheetOpenTarget<TSnap, TRegionKey> | null;
   readonly targetHeight: number;
   readonly controls: ShellAnimationControls[];
   readonly cleanup: () => void;
@@ -65,6 +66,7 @@ type LayerVisual = Readonly<{
   opacity: string;
   filter: string;
   transform: string;
+  continuing: boolean;
 }>;
 
 const presentationChanged = <TSnap extends string, TRegionKey extends string>(
@@ -179,6 +181,7 @@ export function createTransitionCoordinator<
   let pendingTransitionId: number | null = null;
   let currentHeight: number | null = null;
   let openingPrepared = false;
+  const transitioningRegionLayers = new WeakSet<HTMLElement>();
   const warnedTiming = new Set<string>();
   const warnInvalidTiming = (property: string, value: string): void => {
     const signature = `${property}:${value}`;
@@ -262,17 +265,30 @@ export function createTransitionCoordinator<
       const outgoingOffset = reduceMotion ? 0 : -offset;
       const incomingCurrent = currentVisuals.get(incoming);
       const outgoingCurrent = currentVisuals.get(outgoing);
-      const incomingOpacity = incomingCurrent?.opacity || "0";
-      const incomingFilter = incomingCurrent?.filter ||
-        (reduceMotion ? "none" : "blur(2px)");
-      const incomingTransform = incomingCurrent?.transform === "none"
-        ? "translateY(0px)"
-        : incomingCurrent?.transform || `translateY(${incomingOffset}px)`;
-      const outgoingOpacity = outgoingCurrent?.opacity || "1";
-      const outgoingFilter = outgoingCurrent?.filter || "blur(0px)";
-      const outgoingTransform = outgoingCurrent?.transform === "none"
-        ? "translateY(0px)"
-        : outgoingCurrent?.transform || "translateY(0px)";
+      const incomingOpacity = incomingCurrent?.continuing
+        ? incomingCurrent.opacity || "0"
+        : "0";
+      const incomingFilter = incomingCurrent?.continuing
+        ? incomingCurrent.filter || (reduceMotion ? "none" : "blur(2px)")
+        : reduceMotion ? "none" : "blur(2px)";
+      const incomingTransform = incomingCurrent?.continuing
+        ? incomingCurrent.transform === "none"
+          ? "translateY(0px)"
+          : incomingCurrent.transform || `translateY(${incomingOffset}px)`
+        : `translateY(${incomingOffset}px)`;
+      const outgoingOpacity = outgoingCurrent?.continuing
+        ? outgoingCurrent.opacity || "1"
+        : "1";
+      const outgoingFilter = outgoingCurrent?.continuing
+        ? outgoingCurrent.filter || "blur(0px)"
+        : "blur(0px)";
+      const outgoingTransform = outgoingCurrent?.continuing
+        ? outgoingCurrent.transform === "none"
+          ? "translateY(0px)"
+          : outgoingCurrent.transform || "translateY(0px)"
+        : "translateY(0px)";
+      transitioningRegionLayers.add(incoming);
+      transitioningRegionLayers.add(outgoing);
       incoming.style.opacity = incomingOpacity;
       incoming.style.filter = incomingFilter;
       incoming.style.transform = incomingTransform;
@@ -315,6 +331,8 @@ export function createTransitionCoordinator<
       cleanups.push(() => {
         clearLayerMechanics(incoming);
         clearLayerMechanics(outgoing);
+        transitioningRegionLayers.delete(incoming);
+        transitioningRegionLayers.delete(outgoing);
       });
     }
   };
@@ -338,7 +356,9 @@ export function createTransitionCoordinator<
       return;
     }
     if (!visualTarget || !requiredTargetReady(visualTarget, registry)) return;
-    const previousVisualTarget = active?.visualTarget ?? snapshot.settledTarget;
+    const previousVisualTarget = active?.targetId === authoritative.targetId
+      ? active.regionSourceTarget
+      : active?.visualTarget ?? snapshot.settledTarget;
 
     if (portal.hidden && authoritative.open && !openingPrepared) {
       portal.hidden = false;
@@ -424,6 +444,7 @@ export function createTransitionCoordinator<
           opacity: style.opacity,
           filter: style.filter,
           transform: style.transform,
+          continuing: transitioningRegionLayers.has(layer.element),
         });
       }
     }
@@ -468,6 +489,7 @@ export function createTransitionCoordinator<
         transitionId: transition,
         targetId: authoritative.targetId,
         visualTarget,
+        regionSourceTarget: previousVisualTarget,
         targetHeight: geometry.targetHeight,
         controls,
         cleanup: () => {

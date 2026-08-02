@@ -26,6 +26,7 @@ const useSlowTiming = async (page: Page): Promise<void> => {
       --shell-sheet-open-duration: 900ms !important;
       --shell-sheet-close-duration: 900ms !important;
       --shell-sheet-geometry-duration: 900ms !important;
+      --shell-sheet-region-duration: 900ms !important;
     }
   ` });
 };
@@ -158,6 +159,16 @@ test("Arkham uses one animated, non-draggable Popup and rejects stale async comp
   await expect(arkham).toHaveAttribute("data-demo-kind", "arkham.b");
   await expect(page.locator("[data-region='body'][data-layer='outgoing']")).toHaveCount(1);
   await expect(page.locator("[data-region='body'][data-layer='incoming']")).toHaveCount(1);
+  const incomingBody = page.locator("[data-region='body'][data-layer='incoming']");
+  const outgoingBody = page.locator("[data-region='body'][data-layer='outgoing']");
+  await expect.poll(async () => {
+    const frames = await activeKeyframes(incomingBody);
+    return frames.some((frame) => Number(frame.opacity) === 0) &&
+      frames.some((frame) => String(frame.filter).includes("blur(2px)"));
+  }).toBe(true);
+  await expect.poll(async () =>
+    (await activeKeyframes(outgoingBody)).some((frame) => Number(frame.opacity) === 0),
+  ).toBe(true);
   await expect(page.locator("[data-region='header'][data-layer='outgoing']")).toHaveCount(0);
   await expect(page.locator("[data-region='footer'][data-layer='outgoing']")).toHaveCount(1);
   await expect(page.locator("[data-region='body'][data-layer='outgoing']")).toHaveCount(0);

@@ -225,7 +225,7 @@ const initialSnapshot: ShellSheetSnapshot = Object.freeze({
 
 const assignRef = <Value,>(ref: Ref<Value> | undefined, value: Value | null): void => {
   if (typeof ref === "function") ref(value);
-  else if (ref) ref.current = value;
+  else if (ref) (ref as { current: Value | null }).current = value;
 };
 
 const mergeRefs = <Value,>(
@@ -239,6 +239,13 @@ const mergeRefs = <Value,>(
     assignRef(second, value);
   };
 };
+
+const sameIdentityList = (
+  left: readonly unknown[],
+  right: readonly unknown[],
+): boolean =>
+  left.length === right.length &&
+  left.every((value, index) => Object.is(value, right[index]));
 
 const usePartRegistration = <ElementType extends HTMLElement>(
   part: Parameters<ShellSheetDomBinding["registerPart"]>[0],
@@ -456,6 +463,11 @@ export function ShellSheetRoot<
     controller.getSnapshot,
   );
   const [binding, setBinding] = useState<ShellSheetDomBinding<TSnap, TRegionKey> | null>(null);
+  const bindingLeaseRef = useRef<{
+    binding: ShellSheetDomBinding<TSnap, TRegionKey>;
+    signature: readonly unknown[];
+    releaseRequested: boolean;
+  } | null>(null);
   const [titlePresent, setTitlePresent] = useState(false);
   const [descriptionPresent, setDescriptionPresent] = useState(false);
   const titleCountRef = useRef(0);
@@ -493,27 +505,54 @@ export function ShellSheetRoot<
   }, [controller, controllerMode, ownedTarget]);
 
   useEnhancedEffect(() => {
-    const next = bindShellSheetToDom(controller, {
-      ...(props.animation ? { animation: props.animation } : {}),
-      ...(props.environment ? { environment: props.environment } : {}),
-      ...(props.gesture ? { gesture: props.gesture } : {}),
-      ...(props.scrollLock ? { scrollLock: props.scrollLock } : {}),
-      ...(props.backgroundIsolation
-        ? { backgroundIsolation: props.backgroundIsolation }
-        : {}),
-      ...(props.closeOnEscape === undefined
-        ? {}
-        : { closeOnEscape: props.closeOnEscape }),
-      ...(props.closeOnBackdrop === undefined
-        ? {}
-        : { closeOnBackdrop: props.closeOnBackdrop }),
-      ...(props.initialFocus ? { initialFocus: props.initialFocus } : {}),
-    });
-    setBinding(next);
-    if (props.insets) next.setInsets(props.insets);
+    const signature = [
+      controller,
+      props.animation,
+      props.backgroundIsolation,
+      props.closeOnBackdrop,
+      props.closeOnEscape,
+      props.environment,
+      props.gesture,
+      props.initialFocus,
+      props.scrollLock,
+    ] as const;
+    const pending = bindingLeaseRef.current;
+    const lease =
+      pending?.releaseRequested === true &&
+      sameIdentityList(pending.signature, signature)
+        ? pending
+        : {
+            binding: bindShellSheetToDom(controller, {
+              ...(props.animation ? { animation: props.animation } : {}),
+              ...(props.environment ? { environment: props.environment } : {}),
+              ...(props.gesture ? { gesture: props.gesture } : {}),
+              ...(props.scrollLock ? { scrollLock: props.scrollLock } : {}),
+              ...(props.backgroundIsolation
+                ? { backgroundIsolation: props.backgroundIsolation }
+                : {}),
+              ...(props.closeOnEscape === undefined
+                ? {}
+                : { closeOnEscape: props.closeOnEscape }),
+              ...(props.closeOnBackdrop === undefined
+                ? {}
+                : { closeOnBackdrop: props.closeOnBackdrop }),
+              ...(props.initialFocus ? { initialFocus: props.initialFocus } : {}),
+            }),
+            signature,
+            releaseRequested: false,
+          };
+    lease.releaseRequested = false;
+    bindingLeaseRef.current = lease;
+    setBinding(lease.binding);
+    if (props.insets) lease.binding.setInsets(props.insets);
     return () => {
-      setBinding(null);
-      next.destroy();
+      lease.releaseRequested = true;
+      setBinding((current) => (current === lease.binding ? null : current));
+      void Promise.resolve().then(() => {
+        if (!lease.releaseRequested) return;
+        lease.binding.destroy();
+        if (bindingLeaseRef.current === lease) bindingLeaseRef.current = null;
+      });
     };
   }, [
     controller,
@@ -1114,7 +1153,6 @@ const RegionLayerView = ({
         data-starting-style={layer === "incoming" ? "" : undefined}
         data-ending-style={layer === "outgoing" ? "" : undefined}
         aria-hidden={active ? undefined : true}
-        inert={active ? undefined : true}
       >
         {children}
       </div>

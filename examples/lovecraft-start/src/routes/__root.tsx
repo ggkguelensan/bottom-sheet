@@ -1,0 +1,49 @@
+import type { ReactNode } from "react";
+import {
+  HeadContent,
+  Outlet,
+  Scripts,
+  createRootRouteWithContext,
+} from "@tanstack/react-router";
+import type { LovecraftRuntime } from "../runtime.js";
+import "../global.css";
+
+export type RouterContext = Readonly<{ runtime: LovecraftRuntime }>;
+
+export const Route = createRootRouteWithContext<RouterContext>()({
+  head: () => ({
+    meta: [
+      { charSet: "utf-8" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+      { name: "theme-color", content: "#07100f" },
+      {
+        name: "description",
+        content: "Shell Sheet conformance atlas built with TanStack Start and Effector.",
+      },
+      { title: "Мискатоникский архив · Shell Sheet" },
+    ],
+  }),
+  component: RootComponent,
+});
+
+function RootComponent() {
+  return (
+    <RootDocument>
+      <Outlet />
+    </RootDocument>
+  );
+}
+
+function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <html lang="ru">
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        {children}
+        <Scripts />
+      </body>
+    </html>
+  );
+}

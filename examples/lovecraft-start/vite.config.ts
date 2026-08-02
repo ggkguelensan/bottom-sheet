@@ -1,7 +1,11 @@
 import { fileURLToPath, URL } from "node:url";
+import viteReact from "@vitejs/plugin-react";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  root: fileURLToPath(new URL(".", import.meta.url)),
+  plugins: [tanstackStart(), viteReact()],
   resolve: {
     alias: {
       "@shell-sheet/core": fileURLToPath(

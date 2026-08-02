@@ -24,7 +24,7 @@ export default defineConfig({
   test: {
     include: [
       "packages/*/test/**/*.test.{ts,tsx}",
-      "examples/lovecraft-react/src/**/*.test.ts",
+      "examples/lovecraft-start/src/**/*.test.ts",
     ],
     environment: "node",
   },

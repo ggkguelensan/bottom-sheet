@@ -131,6 +131,6 @@ Lovecraft theme, Base UI runtime или `motion/react`. Возможные futur
 не должны менять dependency direction существующих модулей.
 
 Build, SSR и exact reference stack определяет
-[`platform.md`](./platform.md). `examples/lovecraft-react` является текущим
-prototype path и MUST быть мигрирован/переименован в `lovecraft-start`; два
-параллельных главных demo после миграции не сохраняются.
+[`platform.md`](./platform.md). Главный conformance application находится в
+`examples/lovecraft-start`; отдельный legacy `lovecraft-react` после миграции
+не сохраняется.

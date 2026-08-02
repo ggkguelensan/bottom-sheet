@@ -14,6 +14,7 @@ shell-sheet/
 │   ├── README.md
 │   ├── architecture.md
 │   ├── repository-structure.md
+│   ├── platform.md
 │   ├── styling.md
 │   ├── quality.md
 │   ├── modules/
@@ -33,7 +34,7 @@ shell-sheet/
 │   └── react/
 └── examples/
     ├── vanilla/
-    └── lovecraft-react/
+    └── lovecraft-start/        # TanStack Start reference/conformance app
 ```
 
 Новые runtime-модули создаются только при появлении самостоятельной
@@ -81,9 +82,14 @@ packages/<name>/
 ```
 
 - `src/index.ts` является единственным public export surface.
+- Public surface использует named exports; default exports запрещены.
+- Type-only contracts экспортируются через `export type`, чтобы
+  `verbatimModuleSyntax` сохранял runtime graph честным.
 - Внутренние файлы не считаются API и не импортируются потребителями через
   deep path, если subpath export не описан отдельным spec.
 - ESM output и declarations создаются TypeScript project references.
+- Handwritten source/tests/configuration, где tool поддерживает TS, используют
+  только `.ts`/`.tsx`; runtime `.js` существует только как compiled ESM.
 - Package name использует scope `@shell-sheet/*`.
 - React, ReactDOM и Effector являются peer dependencies соответствующих
   adapters.
@@ -116,10 +122,15 @@ Root package остаётся private workspace coordinator. Обязатель�
 | `npm run build` | Собирает все publishable packages |
 | `npm run build:lovecraft` | Выполняет production build главного demo |
 | `npm run dev:vanilla` | Минимальный DOM smoke harness |
-| `npm run dev:lovecraft` | Визуальный React/Effector conformance harness |
+| `npm run dev:lovecraft` | TanStack Start React/Effector conformance app |
 
 ## 6. Non-goals v1
 
 В структуру v1 не добавляются отдельные packages для domain state machine,
 Lovecraft theme, Base UI runtime или `motion/react`. Возможные future adapters
 не должны менять dependency direction существующих модулей.
+
+Build, SSR и exact reference stack определяет
+[`platform.md`](./platform.md). `examples/lovecraft-react` является текущим
+prototype path и MUST быть мигрирован/переименован в `lovecraft-start`; два
+параллельных главных demo после миграции не сохраняются.

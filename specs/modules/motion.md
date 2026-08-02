@@ -19,11 +19,16 @@
 Motion seconds, сохраняет cubic-bezier tuple и возвращает standard controls.
 
 - `stop()` идемпотентен.
-- `finished` resolve означает settle.
-- Motion cancel/reject нормализуется согласованно с DOM driver contract.
+- `finished` всегда resolve в `{ status: "finished" }` или
+  `{ status: "cancelled" }`; штатная cancellation не reject.
+- Motion cancel/reject нормализуется внутри driver согласованно с DOM contract;
+  coordinator один решает terminal core fact.
 - Driver не измеряет element и не выбирает keyframes или snap point.
 - Retarget выполняется coordinator: предыдущий control останавливается, новый
   получает текущую computed geometry как from value.
+- `motion/mini` даёт duration/easing animation. V1 не обещает физический spring
+  с непрерывной release velocity; momentum отражается projected snap selection
+  в core. Spring-capable driver MAY стать будущим расширением общего contract.
 
 ## 4. Bundle contract
 

@@ -9,6 +9,8 @@ Before changing code:
 3. Read every module/example spec touched by the change.
    For React DOM, attributes, CSS variables or theming, always read
    `specs/styling.md`.
+   For TypeScript, package build, SSR/hydration or target-stack changes, always
+   read `specs/platform.md`.
 4. Update the spec before tests and implementation when observable behavior,
    public API, dependencies or repository structure changes.
 5. Do not introduce normative requirements in `docs/`, README, comments or demo

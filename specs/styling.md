@@ -22,7 +22,7 @@ Shell Sheet MUST совпадать с Base UI для общей drawer-сема
 - common part state shape;
 - common `data-*` attributes;
 - common `--drawer-*` CSS variables и их единицы/смысл;
-- controlled/uncontrolled visual states;
+- controlled/default-open convenience visual states;
 - `nativeButton` для button primitives;
 - `data-base-ui-swipe-ignore` как opt-out gesture attribute.
 
@@ -40,9 +40,16 @@ theme values: colors, radii, shadows, typography, spacing и z-index прина�
 consumer.
 
 Internal inline styles разрешены только для механики, которую вычисляет
-движок: measured block-size, current transform, visibility during measurement,
-pointer capture и accessibility hiding. Consumer styling не должен зависеть от
-внутренних class names.
+движок: measured inline/block size, current transform, overflow/touch action,
+visibility during measurement и accessibility hiding. Во время measured
+`sheet ↔ dialog` morph adapter MAY временно интерполировать считанные computed
+radii/backdrop values, но после settle снова владеет consumer CSS. Consumer
+styling не должен зависеть от внутренних class names.
+
+Mandatory Popup/Content grid containment и only-Body overflow из DOM contract
+также относятся к mechanics. Они поставляются без theme values. Consumer не
+должен переопределять structural `display`, grid rows, containment или
+scroll-viewport ownership, если ожидает v1 layout guarantees.
 
 `.shell-sheet-*` classes MAY существовать как debug/legacy hooks, но не являются
 стабильным public API v1. Public hooks — props, part state, attributes и CSS
@@ -172,6 +179,12 @@ type ShellSheetCloseState = {
 имеют стабильные false/zero values. Они присутствуют ради styling/type
 portability и не обещают nested behavior.
 
+`open` и `expanded` отражают authoritative target:
+`expanded=true`, когда выбранная snap point является самой высокой физически
+отличающейся resolved point. `swipeDirection` в bottom-only v1 стабильно равен
+`"down"`. `swiping` отражает только accepted active DOM gesture после
+threshold, не обычный pointerdown.
+
 `Portal`, `Content`, `Title` и `Description` имеют empty state `{}` как Base UI.
 
 Shell-specific regions расширяют общий visual state:
@@ -185,12 +198,25 @@ type ShellSheetRegionState = {
   active: boolean;
 };
 
+type ShellSheetPresentationState = {
+  presentation: "sheet" | "dialog" | null;
+  modality: "modal" | "non-modal" | null;
+  fromPresentation: "sheet" | "dialog" | null;
+  toPresentation: "sheet" | "dialog" | null;
+  transitioning: boolean;
+};
+
 type ShellSheetHandleState = {
   disabled: boolean;
   expanded: boolean;
   swiping: boolean;
 };
 ```
+
+Popup function props получают
+`ShellSheetPopupState & ShellSheetPresentationState`; Viewport получает stable
+target `presentation/modality` без from/to transition fields. Region/Handle
+state остаётся минимальным и не копирует весь Root snapshot.
 
 ## 6. Base-compatible data attributes
 
@@ -222,6 +248,10 @@ state.
 - `data-starting-style`;
 - `data-ending-style`.
 
+`data-expanded` следует definition выше. `data-swipe-dismiss` присутствует во
+время accepted gesture, когда current movement находится ниже lowest snap в
+направлении close; окончательное закрытие всё равно является external request.
+
 ### Gesture opt-out
 
 `data-base-ui-swipe-ignore` MUST отключать drawer/sheet gesture для element и
@@ -237,7 +267,16 @@ Shell-specific alias; оба атрибута имеют одинаковый р
 - `data-ending-style` на outgoing layer;
 - `data-transitioning` на region host во время crossfade;
 - `data-presentation="sheet|dialog"` и `data-modality="modal|non-modal"` на
-  Popup/Viewport, где это полезно для styling.
+  Viewport и Popup;
+- `data-from-presentation="sheet|dialog"`,
+  `data-to-presentation="sheet|dialog"` и boolean `data-transitioning` на Popup
+  во время measured presentation morph.
+
+`data-presentation`/`data-modality` выражают open authoritative target. Во
+время closing они сохраняют settled open values до terminal exit; после fully
+closed MAY отсутствовать. From/to attributes выражают только активную visual
+attempt и удаляются одной transaction после settle/replacement. Responsive CSS
+не должно менять смысл `data-presentation` без нового application target.
 
 Нельзя вводить альтернативный attribute для уже существующей Base UI
 семантики (`data-entering` вместо `data-starting-style`, например).
@@ -250,7 +289,7 @@ Shell-specific alias; оба атрибута имеют одинаковый р
 | --- | --- | --- |
 | Backdrop | `--drawer-swipe-progress` | unitless `0..1` progress dismissal gesture |
 | Viewport | `--drawer-keyboard-inset` | CSS length от нижней границы layout viewport; fallback consumer всегда указывает сам |
-| Popup | `--drawer-height` | measured popup block-size как CSS length |
+| Popup | `--drawer-height` | target measured popup block-size как CSS length; temporary inline size wins during motion |
 | Popup | `--drawer-frontmost-height` | frontmost height; в v1 равно `--drawer-height` |
 | Popup | `--drawer-snap-point-offset` | CSS length offset активной snap point |
 | Popup | `--drawer-swipe-movement-x` | CSS length текущего X gesture movement |
@@ -279,42 +318,65 @@ Shell-specific values используют отдельный prefix и не д�
 - `--shell-sheet-header-height`;
 - `--shell-sheet-body-natural-height`;
 - `--shell-sheet-footer-height`;
-- `--shell-sheet-target-height`;
-- `--shell-sheet-region-duration`.
+- `--shell-sheet-target-inline-size`;
+- `--shell-sheet-open-duration` (default `280ms`);
+- `--shell-sheet-close-duration` (default `220ms`);
+- `--shell-sheet-geometry-duration` (default `270ms`);
+- `--shell-sheet-region-duration` (default `220ms`);
+- `--shell-sheet-easing-enter` (default
+  `cubic-bezier(0.32, 0.72, 0, 1)`);
+- `--shell-sheet-easing-change` (default
+  `cubic-bezier(0.65, 0, 0.35, 1)`).
+
+DOM adapter читает timing variables как computed CSS в preparation phase,
+runtime-валидирует их и передаёт driver. Invalid/empty value использует default
+и вызывает development warning. Они не читаются на каждом frame.
 
 Prototype variable `--shell-sheet-height` заменяется
 `--drawer-height`; после v1 она не является public contract.
 
 ## 8. Animation styling contract
 
-Consumer может использовать Base UI selectors:
+Consumer использует Base UI-shaped selectors для stable layout/gesture
+projection и Shell timing tokens:
 
 ```css
-.Popup,
-.Backdrop {
-  transition-duration: 280ms;
-  transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+.Popup {
+  --shell-sheet-open-duration: var(--duration-drawer-enter, 280ms);
+  --shell-sheet-close-duration: var(--duration-drawer-exit, 220ms);
+  --shell-sheet-easing-enter: var(
+    --ease-drawer-enter,
+    cubic-bezier(0.32, 0.72, 0, 1)
+  );
+
+  height: var(--drawer-height);
+  transform: translateY(
+    calc(var(--drawer-snap-point-offset) + var(--drawer-swipe-movement-y))
+  );
 }
 
-.Popup[data-starting-style],
-.Popup[data-ending-style] {
-  transform: translateY(100%);
-}
-
-.Backdrop[data-starting-style],
-.Backdrop[data-ending-style] {
-  opacity: 0;
-}
-
-.Popup[data-swiping],
-.Backdrop[data-swiping] {
-  transition-duration: 0ms;
+.Popup[data-presentation="dialog"] {
+  border-radius: var(--dialog-radius, 24px);
 }
 ```
 
-Driver-owned motion и CSS hooks MUST describe the same phase in the same frame.
-Inline mechanic styles не должны блокировать consumer opacity, color, shadow,
-radius or backdrop-filter transitions.
+Driver является единственным владельцем animation для Popup transform/size,
+Backdrop progress и region opacity/blur/offset. Consumer MUST NOT добавлять CSS
+transition/animation этих же mechanics properties: это создаёт второй clock и
+ломает interruption/terminal ordering. During animation inline mechanic value
+имеет приоритет; после settle adapter удаляет его, а Base variables/stable CSS
+уже описывают ту же final geometry.
+
+`data-starting-style`, `data-ending-style` и `data-swiping` сохраняются для
+Base-compatible state styling, но не требуют от consumer реализовать lifecycle
+CSS transition. Color/shadow/typography и target radius принадлежат consumer;
+coordinator MAY интерполировать считанный radius только во время presentation
+morph.
+
+Presentation morph является driver-owned measured transition. Consumer
+выбирает target theme через `data-presentation`; adapter считывает resulting
+geometry/computed values, анимирует только mechanics и удаляет transient
+inline overrides после settle. Scale Popup/текста для morph запрещён.
 
 Region layers переиспользуют `data-starting-style/data-ending-style`, но их
 geometry и blur синхронизирует единый coordinator.
@@ -331,7 +393,8 @@ geometry и blur синхронизирует единый coordinator.
 | Common `--drawer-*` variables | MUST match name, unit and meaning |
 | `nativeButton` | MUST match on common button parts; extended to Handle |
 | `data-base-ui-swipe-ignore` | MUST work |
-| Full Root prop compatibility | Tracked separately; not implied by styling compatibility |
+| Full Root prop compatibility | Not promised; functional modes are fixed in `modules/react.md` |
+| Swipe-to-drag from native Body scroll surface | Outside v1; Handle/DragArea only |
 | Nested/Indent/SwipeArea behavior | Outside v1, no false claim of support |
 
 ## 10. Conformance tests
@@ -340,9 +403,12 @@ geometry и blur синхронизирует единый coordinator.
 - DOM snapshots assert exact default tags and boolean attribute presence.
 - Popup state fixture asserts Base-compatible common fields.
 - CSS variable tests assert names, units, initial values and update timing.
-- A copied Base UI bottom-drawer styling recipe works after replacing only the
-  component import/name.
+- A Base UI bottom-drawer selector/token port compiles after replacing
+  component names; declarations, которые запускают CSS transition
+  driver-owned mechanics, удаляются по documented migration rule.
 - Region tests assert incoming/outgoing attributes and unchanged-region DOM
   identity.
+- Presentation tests assert target/from/to attributes, same Popup identity и
+  cleanup transient inline mechanics after settle/interruption.
 - Static test ensures `@shell-sheet/react` imports no CSS.
 - Migration test ensures internal/legacy classes are not required for behavior.

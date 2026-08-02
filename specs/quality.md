@@ -10,6 +10,9 @@ npm run typecheck:demo
 npm test
 npm run build
 npm run build:lovecraft
+npm run test:ssr
+npm run test:browser
+npm run check:packages
 ```
 
 `git diff --check` не должен находить whitespace errors.
@@ -20,6 +23,8 @@ npm run build:lovecraft
 
 - core state transitions;
 - snap resolution/selection;
+- non-finite validation, clamped duplicate heights, projected/sequential
+  release и progressive rubber band;
 - request/target/fact identity;
 - stale transition и async operation guards.
 
@@ -27,6 +32,7 @@ npm run build:lovecraft
 
 - native и Motion animation drivers;
 - DOM binding с fake environment;
+- measurement read/write transaction, token-safe registry и modality ownership;
 - Effector global/forked scope;
 - React compound parts и SSR.
 - Base UI-shaped default tags, function styling props, state, data attributes
@@ -35,11 +41,13 @@ npm run build:lovecraft
 ### Browser interaction
 
 - touch drag на реальном viewport;
-- nested Body scroll arbitration;
+- native Body scroll isolation from registered Handle/DragArea gestures;
 - VisualViewport/software keyboard;
 - focus trap/restore и inert;
 - pointer cancel/lost capture;
 - rapid open/close/retarget.
+- same-Popup sheet↔dialog interruption;
+- real iOS/WebKit and Android/Chromium smoke before release candidate.
 
 ### Visual conformance
 
@@ -49,6 +57,24 @@ npm run build:lovecraft
 - sheet↔dialog;
 - reduced motion;
 - mobile safe areas и desktop constraints.
+
+### Normative test seams
+
+Tests пишутся на заранее зафиксированных interfaces:
+
+1. exported pure core algorithms;
+2. public core controller request/target/fact protocol;
+3. DOM binding + registered elements через injected environment;
+4. shared animation-driver contract;
+5. Effector binding units/scopes;
+6. React compound DOM/accessibility contract;
+7. browser-visible user interaction.
+
+Private helper files не получают собственные coupled tests, если behavior уже
+наблюдаем через seam. Implementation ведётся vertical red→green slices: один
+failing behavioral test, минимальный проходящий implementation, следующий
+slice. Массовый горизонтальный набор tests до первого работающего slice
+запрещён.
 
 ## 3. Determinism
 
@@ -69,11 +95,14 @@ settle.
 ## 5. Performance и bundle
 
 - Pointer move не вызывает React render или Effector event на каждом frame.
+- Pointer move не публикует public core fact на каждом frame.
 - Per-frame gesture mechanics обновляют только Popup/Backdrop public mechanics
   styles and variables; React render и Effector event на каждом frame
   запрещены.
 - Layout animation изолирована Popup containment.
 - ResizeObserver work коалесцируется.
+- Measurement transaction выполняет DOM reads до writes; presentation morph
+  не масштабирует text subtree.
 - `@shell-sheet/core` не имеет runtime dependencies.
 - Motion driver target budget: 3 kB minified+gzip.
 - React adapter не импортирует `motion/react`.
@@ -82,7 +111,22 @@ settle.
 Bundle budgets MUST измеряться CI-инструментом на tree-shaken consumer fixture.
 README не публикует неподтверждённые размеры.
 
-## 6. Compatibility matrix
+## 6. Package, TypeScript and SSR gates
+
+- `tsc -b` проходит с strict options из `platform.md`.
+- Source scan не находит handwritten `.js/.jsx/cjs/mjs` вне generated output
+  и third-party directories.
+- Каждый `npm pack` tarball проходит `publint` и
+  `@arethetypeswrong/cli`.
+- Node ESM и Vite TypeScript consumer fixtures импортируют только public
+  exports.
+- Import всех packages в Node SSR environment не читает browser globals.
+- TanStack Start server render + hydration не имеет mismatch и не показывает
+  unmeasured open Portal.
+- React 18.3 является primary fixture, React 19 — compatibility fixture.
+- Effector scope и QueryClient изолированы между SSR requests.
+
+## 7. Compatibility matrix
 
 Перед v1 фиксируются и тестируются поддерживаемые версии:
 
@@ -93,7 +137,7 @@ README не публикует неподтверждённые размеры.
 - browser baseline для Pointer Events, ResizeObserver, VisualViewport, inert и
   WAAPI либо documented fallback.
 
-## 7. Release definition
+## 8. Release definition
 
 Package может считаться v1-ready только когда:
 

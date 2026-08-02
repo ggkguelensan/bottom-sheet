@@ -24,7 +24,7 @@ Adapter владеет только attach/detach, доставкой target в 
 Целевой adapter принимает существующие units приложения:
 
 ```ts
-createShellSheetBinding<TSnapPoint>({
+createShellSheetBinding<TSnapPoint, TRegionKey>({
   $target,
   requestReceived,
   visualFactReceived,
@@ -43,6 +43,12 @@ createShellSheetBinding<TSnapPoint>({
 Convenience model с собственным `$state` MAY существовать отдельным export, но
 не является default binding и не используется приложением с `$flow`.
 
+При совместном использовании React application создаёт controller на уровне
+app/scope lifecycle, attach-ит его к binding и передаёт тот же instance в
+`<ShellSheet.Root controller={controller}>`. Root работает в external
+controller mode и не выполняет второй target sync. Без React тот же controller
+передаётся напрямую в DOM binding.
+
 ## 4. Synchronization
 
 ```text
@@ -55,8 +61,14 @@ Snap proposal не изменяет `$shellTarget` автоматически. D
 переводит B.1↔B.2 или возвращает прежнее состояние. Visual fact никогда не
 переписывает `$flow` без явного application sample.
 
-Один target update передаёт `targetId`, open, snap, presentation, regions и
-transition intent атомарно.
+Один target update передаёт complete `ShellSheetTarget`: closed union либо
+open union с `targetId`, snap definitions/selection, presentation, modality,
+regions и transition intent. Adapter не раскладывает target на независимые
+stores перед `controller.sync()`.
+
+Controller request/fact delivery низкочастотна. Pointer move/velocity samples
+не проходят через Effector; adapter получает interaction start/end и один
+release proposal.
 
 ## 5. Async business flow
 
@@ -73,4 +85,5 @@ Adapter не отменяет application effects. Demo/application обязан
 
 Tests MUST покрывать attach/detach, initial sync, atomic target sync, proposal
 accept/reject, visual fact forwarding, no feedback loop, forked scope isolation
-и отсутствие сериализации controller/DOM snapshots.
+и отсутствие сериализации controller/DOM snapshots. Отдельный performance
+test доказывает отсутствие Effector event на pointer move.

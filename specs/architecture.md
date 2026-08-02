@@ -24,8 +24,8 @@ Shell Sheet — не просто drawer, modal или набор React-слот
    регион не дублируется, не размывается и не теряет DOM-состояние.
 6. Целевой snap point выбирает внешний источник истины. Shell Sheet не выводит
    бизнес-решение о следующем состоянии из высоты контента.
-7. Gesture и imperative API формируют запросы. В controlled-режиме они не
-   присваивают authoritative state напрямую.
+7. Gesture и imperative API формируют запросы. Они никогда не присваивают
+   authoritative target напрямую.
 
 Подход к движению следует принципам
 [Emil Kowalski design engineering](https://github.com/emilkowalski/skills):
@@ -35,8 +35,8 @@ motion объясняет изменение, остаётся отзывчив�
 
 ### 2.1. Доменная state machine
 
-В controlled-режиме единственным источником истины является приложение:
-Effector, другой state manager или состояние React. Прикладной flow описывается
+Единственным источником истины является приложение: Effector, другой state
+manager или локальный owner React adapter. Прикладной flow описывается
 discriminated union, а не комбинацией независимых nullable-полей и boolean
 flags.
 
@@ -45,6 +45,11 @@ flags.
 
 ```ts
 type RequestId = string & { readonly __requestId: unique symbol };
+
+type ClosedState = {
+  kind: "closed";
+  uiContext: Record<never, never>;
+};
 
 type AState = {
   kind: "A";
@@ -82,6 +87,7 @@ type CLoadingState = {
 };
 
 type FlowState =
+  | ClosedState
   | AState
   | BState
   | CLoadingState
@@ -108,8 +114,8 @@ Renderer обязан делать exhaustive match по `kind`. Поэтому 
 но не передаются контентному компоненту как UI props.
 
 Имена состояний, `uiContext` и их бизнес-смысл не входят в
-`@shell-sheet/core`. Библиотека получает только React content, controlled
-open/snap target и ключи визуальных регионов.
+`@shell-sheet/core`. Библиотека получает только атомарный visual target и ключи
+визуальных регионов; React content регистрирует React adapter.
 
 ### 2.2. Atomic target
 
@@ -119,40 +125,27 @@ open/snap target и ключи визуальных регионов.
 несвязанным обновлением выбрать `b.compact`.
 
 ```ts
-type ShellTransitionIntent = {
-  cause:
-    | "open"
-    | "close"
-    | "forward"
-    | "backward"
-    | "replace"
-    | "snap"
-    | "resize";
-  direction: "forward" | "backward" | "none";
-  motion: "auto" | "instant";
-};
+import type { ShellSheetTarget } from "@shell-sheet/core";
 
-type ShellRegionTarget = {
-  key: string;
-  behavior: "preserve" | "crossfade" | "replace";
-};
+type DemoSnapPoint =
+  | "a.content"
+  | "b.compact"
+  | "b.expanded"
+  | "c.content";
 
-type ShellTarget = {
-  /** Идентичность одной атомарной доменной транзакции. */
-  targetId: string;
-  open: boolean;
-  snapPoint: "a.content" | "b.compact" | "b.expanded" | "c.content";
-  presentation: "sheet" | "dialog";
-  transition: ShellTransitionIntent;
-  regions: {
-    header: ShellRegionTarget;
-    body: ShellRegionTarget;
-    footer: ShellRegionTarget;
-  };
-};
+type DemoRegionKey =
+  | "navigation"
+  | "location-summary"
+  | "location-details"
+  | "loading"
+  | "primary-actions";
+
+type ShellTarget = ShellSheetTarget<DemoSnapPoint, DemoRegionKey>;
 
 function projectShellTarget(state: FlowState): ShellTarget {
   switch (state.kind) {
+    case "closed":
+      return targetForClosed();
     case "A":
       return targetForA(state.uiContext);
     case "B.1":
@@ -179,14 +172,24 @@ Sheet только визуализирует уже выбранный target. 
 старым snap point.
 
 `transition` тоже является бизнес-решением. Shell Sheet не выводит направление
-из высоты или порядка snap points: B → C.loading может быть `forward`, Back —
-`backward`, loading → success — `replace`, а B.1 → B.2 — `snap`.
+из высоты или порядка snap points: B → C.loading может иметь
+`cause: "navigate", direction: "forward"`, Back — `backward`, loading →
+success — `replace`, а B.1 → B.2 — `snap`.
+
+Open target атомарно включает snap definitions, выбранный snap, presentation,
+modality, draggable policy, content-resize policy и три region targets. Closed
+target не притворяется открытым target с `snapPoint: null`. Полный normative
+union находится в [`modules/core.md`](./modules/core.md#3-atomic-target).
 
 `targetId` создаётся приложением для каждого принятого доменного перехода.
 Внутренний `transitionId` создаёт Shell Sheet для каждой попытки визуально
 достичь target. Lifecycle events содержат оба идентификатора, поэтому
 завершение старой анимации нельзя ошибочно принять за достижение нового
 доменного состояния.
+
+В reference application `targetId` строится из scope-local monotonic domain
+revision и serializable state identity, а не из wall clock/random во время
+render. Это сохраняет SSR/hydration determinism.
 
 ### 2.3. Асинхронные состояния и отмена
 
@@ -245,9 +248,16 @@ sample({
 типизированная таблица operation tokens в служебном поле `operation`; правило
 совпадения активного состояния и token остаётся тем же.
 
+В reference stack `loadCFx` является typed bridge к
+`queryClient.fetchQuery()`/observer, а `cancelCRequestFx` — к
+`queryClient.cancelQueries()`. TanStack Query остаётся владельцем remote cache,
+retry и transport AbortSignal; Effector владеет только flow/operation identity
+и решением, можно ли результату изменить экран. Payload не зеркалируется в
+ещё один бесконтрольный cache store.
+
 ### 2.4. Команды и запросы
 
-В controlled-режиме:
+В application-owned режиме:
 
 ```text
 Effector state → React props → целевое состояние Shell Sheet
@@ -260,7 +270,8 @@ Shell Sheet event → subscribe/onChange → Effector event
 `snapPoint: "b.expanded"`.
 
 Ephemeral pointer state — текущий offset, velocity samples и pointer capture —
-остаётся в controller/DOM слое и не проходит через Effector на каждом кадре.
+остаётся только в DOM слое и не проходит через core subscribers, Effector или
+React на каждом кадре.
 
 ### 2.5. Authoritative target и visual snapshot
 
@@ -271,36 +282,38 @@ Ephemeral pointer state — текущий offset, velocity samples и pointer c
 - Shell Sheet хранит только временное визуальное состояние перехода.
 - `onSnapPointChange` и gesture release отправляют proposal в Effector.
 - Effector принимает proposal, выбирает другой target или отклоняет его.
-- Новый controlled target возвращается через props/`controller.sync()`.
+- Новый authoritative target возвращается через props/`controller.sync()`.
 - `subscribe()` сообщает Effector фактические lifecycle events для аналитики,
   оркестрации и тестов, но они не переписывают domain state автоматически.
 
-Наблюдаемый snapshot должен различать settled и target значения:
+Наблюдаемый snapshot различает authoritative и settled targets:
 
 ```ts
 type ShellSheetVisualSnapshot = {
-  targetId: string | null;
+  authoritativeTarget: ShellTarget | null;
+  settledTarget: Extract<ShellTarget, { open: true }> | null;
   phase:
     | "closed"
+    | "preparing"
     | "opening"
     | "open"
     | "dragging"
     | "transitioning"
-    | "closing";
-  settledSnapPoint: string | null;
-  targetSnapPoint: string | null;
-  transitionId: number;
+    | "closing"
+    | "destroyed";
+  transitionId: number | null;
 };
 ```
 
-Во время B.1 → B.2 Effector уже хранит B.2 как target, пока visual snapshot
-ещё сообщает `settledSnapPoint: "b.compact"` и
-`targetSnapPoint: "b.expanded"`. После `transition-settled` оба значения
-совпадают.
+Во время B.1 → B.2 `authoritativeTarget.snapPoint` уже равен `b.expanded`, пока
+`settledTarget.snapPoint` ещё равен `b.compact`. После
+`transition-settled` settled target становится authoritative. Удобные
+`targetSnapPoint`/`settledSnapPoint` MAY быть derived selectors, но не отдельные
+изменяемые ячейки.
 
 Если Effector отклонил drag proposal, DOM binding анимирует поверхность от
 текущей pointer geometry обратно к последнему authoritative snap point. Для
-этого изменение controlled prop не требуется: reconciliation после release
+этого изменение target prop не требуется: reconciliation после release
 всегда читает актуальный snapshot controller. Если Effector синхронно принял
 другой target, та же анимация сразу retargeted к нему.
 
@@ -338,7 +351,7 @@ Request получает собственный `requestId` и причину (`
 `keyboard`). Target ссылается на новый `targetId`. Visual fact содержит
 `targetId` и `transitionId`. Imperative method не должен возвращать Promise,
 создающий впечатление, что proposal уже принят: принятие видно только по новому
-controlled target, а завершение — по `transition-settled`.
+authoritative target, а завершение — по `transition-settled`.
 
 ## 3. Модель перехода
 
@@ -358,7 +371,8 @@ idle → preparing → animating → settling → idle
 - `settling`: фиксируются target styles, outgoing-слои удаляются.
 
 Каждый переход получает sequence token. Завершение отменённой анимации не
-может вызвать `settle()` для более нового состояния.
+может вызвать tokenized settle для более нового состояния. Каждый started
+token получает ровно один terminal fact.
 
 ### 3.2. Алгоритм A → B.1
 
@@ -484,7 +498,7 @@ type ShellTransitionResult =
       status: "cancelled";
       targetId: string;
       transitionId: number;
-      reason: "closed" | "destroyed" | "reduced-motion" | "driver-cancelled";
+      reason: "destroyed" | "driver-cancelled" | "registry-lost";
     };
 ```
 
@@ -494,7 +508,7 @@ result.
 
 ## 4. Motion contract
 
-Рекомендованные defaults:
+V1 driver defaults (consumer меняет их documented CSS timing tokens):
 
 | Motion | Duration | Easing | Properties |
 | --- | ---: | --- | --- |
@@ -502,7 +516,22 @@ result.
 | Close | 220 ms | `cubic-bezier(0.32, 0.72, 0, 1)` | transform, backdrop opacity |
 | Snap/geometry | 260–280 ms | strong ease-in-out/drawer curve | isolated Popup height |
 | Region transition | 220 ms | strong ease-in-out | opacity, transform 6–12 px, blur 2 px |
-| Button active | 120–160 ms | ease-out | scale 0.97 |
+
+Driver — единственный clock для geometry, Backdrop progress и region motion.
+Consumer CSS задаёт target appearance/timing tokens, но не запускает вторую CSS
+transition тех же mechanic properties.
+
+Default spatial models:
+
+- sheet opening/closing перемещает Popup по Y от/к полностью скрытой нижней
+  позиции, Backdrop меняет opacity;
+- dialog opening/closing использует opacity + 12 px vertical offset без scale
+  текста;
+- region forward/backward offset имеет противоположный знак, `replace` не
+  придумывает navigation direction, `snap` с неизменными keys не трогает
+  regions;
+- `motion: "instant"` — единственный application-requested путь без animation;
+  reduced motion применяет отдельную policy ниже.
 
 Анимация высоты является сознательным исключением из GPU-only правила:
 реальная высота нужна для scroll layout и закреплённого Footer. Layout impact
@@ -515,15 +544,23 @@ result.
 - geometry принимает target без продолжительного пространственного движения;
 - смысл перехода и порядок focus/inert lifecycle сохраняются.
 
+Reduced motion применяет и settles target обычным terminal success. Это не
+`cancelled` transition.
+
 ## 5. Layout contract
 
 ```css
 .shell-sheet-popup {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
   min-height: 0;
   overflow: hidden;
   contain: layout paint;
+}
+
+.shell-sheet-content {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  block-size: 100%;
+  min-height: 0;
 }
 
 .shell-sheet-body {
@@ -541,6 +578,25 @@ result.
   граница движется вверх.
 - В dialog presentation Header и Footer закреплены к границам dialog Popup.
 
+### 5.1. Sheet ↔ dialog
+
+`sheet` и `dialog` — два presentation одного singleton Popup. Они не
+реализуются условным mount двух разных поверхностей.
+
+- Application выбирает реальный target presentation; CSS media query не может
+  молча показать `dialog` target как sheet.
+- DOM coordinator измеряет текущий и целевой rect, применяет target layout и
+  анимирует translate + inline/block size без scale текста.
+- Geometry, computed radius/backdrop и изменившиеся regions начинаются одной
+  transaction.
+- Header/Footer остаются pinned, Body остаётся единственным scroll viewport.
+- Interruption начинает новый morph от текущего visual rect.
+- Modality lifecycle синхронизируется с morph: protections приобретаются до
+  первого modal frame и снимаются только после terminal non-modal/close frame.
+
+Детальный measurement/FLIP-like protocol находится в
+[`modules/dom.md`](./modules/dom.md#8-sheet--dialog-morph).
+
 ## 6. Drag contract
 
 - По умолчанию Header содержит Handle.
@@ -553,7 +609,10 @@ result.
 - Интерактивные descendants и `data-shell-sheet-drag-ignore` не начинают drag.
 - Pointer capture, single-pointer protection, velocity и boundary damping
   реализуются в DOM adapter.
-- В controlled-режиме drag release публикует snap request. Внешний store может
+- V1 начинает drag только с registered Handle/DragArea. Body сохраняет native
+  vertical scroll и не обещает mid-gesture handoff в Sheet; DragArea не должен
+  охватывать native Body scroller.
+- Drag release публикует snap request. Внешний store может
   принять запрос, заменить target или оставить прежний snap point.
 
 Open, close и snap являются отменяемыми requests, а не безусловными командами.
@@ -580,17 +639,9 @@ API следует общей анатомии Base UI Drawer, но runtime-за
 
 ```tsx
 <ShellSheet.Root
-  targetId={view.targetId}
-  open={view.open}
-  snapPoints={snapPoints}
-  snapPoint={view.snapPoint}
-  transition={view.transition}
-  contentResizeBehavior="animate"
-  onOpenChange={openRequested}
-  onSnapPointChange={snapRequested}
-  onTransitionStatusChange={shellTransitionObserved}
-  presentation={presentation}
-  draggable={draggable}
+  target={shellTarget}
+  onRequest={shellRequestReceived}
+  onFact={shellFactReceived}
   apiRef={shellSheetApiRef}
 >
   <ShellSheet.Trigger />
@@ -601,24 +652,15 @@ API следует общей анатомии Base UI Drawer, но runtime-за
     <ShellSheet.Viewport>
       <ShellSheet.Popup>
         <ShellSheet.Content>
-          <ShellSheet.Header
-            transitionKey={view.regions.header.key}
-            behavior={view.regions.header.behavior}
-          >
+          <ShellSheet.Header>
             {header}
           </ShellSheet.Header>
 
-          <ShellSheet.Body
-            transitionKey={view.regions.body.key}
-            behavior={view.regions.body.behavior}
-          >
+          <ShellSheet.Body>
             {body}
           </ShellSheet.Body>
 
-          <ShellSheet.Footer
-            transitionKey={view.regions.footer.key}
-            behavior={view.regions.footer.behavior}
-          >
+          <ShellSheet.Footer>
             {footer}
           </ShellSheet.Footer>
         </ShellSheet.Content>
@@ -640,19 +682,18 @@ API следует общей анатомии Base UI Drawer, но runtime-за
   при изменении только header content.
 - `ShellSheetApi` является imperative port, но не источником истины.
 - `onTransitionStatusChange`/`api.subscribe()` отдают observed visual state;
-  authoritative target по-прежнему приходит только через controlled props.
+  authoritative target по-прежнему приходит только через `target`.
 - Все DOM primitives поддерживают Base UI-shaped `render`, function
   `className/style`, стабильные `data-*` attributes и ref forwarding.
-- Uncontrolled mode остаётся доступным для простых случаев.
+- Base-shaped `open/defaultOpen` convenience mode остаётся доступным для
+  простых случаев, но React adapter проецирует его в тот же core target
+  protocol. Core не получает второго uncontrolled state path.
 
 Demo получает `FlowState` и `ShellTarget` одним React render. `kind` выбирает
 компонент, а в него передаётся только соответствующий `uiContext`:
 
 ```tsx
-<ShellSheet.Body
-  transitionKey={shellTarget.regions.body.key}
-  behavior={shellTarget.regions.body.behavior}
->
+<ShellSheet.Body>
   {renderFlowBody(flow)}
 </ShellSheet.Body>
 ```
@@ -665,7 +706,7 @@ Demo получает `FlowState` и `ShellTarget` одним React render. `kin
 ### `@shell-sheet/core`
 
 - framework-agnostic controller;
-- controlled/uncontrolled open и snap state;
+- всегда target-driven authoritative synchronization;
 - snap point resolution и selection;
 - request events и snapshots;
 - sequence-safe transition lifecycle;
@@ -702,7 +743,7 @@ Demo получает `FlowState` и `ShellTarget` одним React render. `kin
 - Portal и singleton refs;
 - independent keyed region layers;
 - координация React commit с DOM measurements;
-- controlled props и `ShellSheetApi`;
+- atomic target/Base-shaped convenience props и `ShellSheetApi`;
 - React/ReactDOM только peer dependencies.
 
 ## 9. Сквозные проектные инварианты
@@ -767,8 +808,9 @@ native и Motion animation drivers.
   `--shell-sheet-*` namespace и не меняют смысл Base-compatible hooks.
 - `data-base-ui-swipe-ignore` поддерживается наряду с Shell-specific alias.
 - Internal `.shell-sheet-*` classes не являются обязательным public API.
-- Dev mode предупреждает о неизвестном snap point, дублирующихся region keys,
-  отсутствующем Title и конфликтующем controlled/uncontrolled API.
+- Dev mode предупреждает о неизвестном snap point, повторно использованном
+  `targetId`, дублирующихся region keys, отсутствующем Title и конфликтующем
+  target/Base-convenience API.
 
 ### 9.5. Граница домена
 
@@ -776,6 +818,34 @@ Shell Sheet не предоставляет универсальную бизн�
 `kind`, `uiContext`, history, request cancellation или маршрутах. Effector
 adapter принимает производный `$shellTarget` и публикует typed requests/facts.
 Доменная machine и exhaustive renderer остаются в приложении или demo.
+
+### 9.6. Глубина модулей и TypeScript implementation rules
+
+Core controller и DOM binding проектируются как deep modules: маленький public
+interface скрывает scheduling, registries, measurements и browser mechanics.
+Внутренние файлы — не новые public seams.
+
+- Tests наблюдают public module interface и DOM contract, а не private helpers.
+- Внешние dependencies принимаются на реальных seams. Animation driver имеет
+  две реализации (native/Motion), browser environment нужен deterministic
+  tests; гипотетические adapters без второго consumer не добавляются.
+- Immutable public targets/snapshots сочетаются с локальной essential mutation
+  внутри controller queue, DOM registry и hot pointer loop. Mutation не
+  протекает наружу и не заменяется allocation-heavy spreads ради стиля.
+- Exported functions, contracts и discriminated unions типизированы явно;
+  intermediate values используют inference.
+- Config/domain tables используют `as const satisfies`, когда нужны literal
+  unions и проверка shape; avoidable `as`/`any` не являются design shortcut.
+- Recoverable request/driver outcomes выражаются tagged data. Programmer errors
+  и нарушенные invariants fail fast.
+- Implementation выполняется вертикальными red→green slices по заранее
+  определённым seams, а не одним горизонтальным слоем tests и затем code.
+
+Эти правила адаптируют
+[Matt Pocock codebase-design/TDD](https://github.com/mattpocock/skills) и
+[declaratify-ts](https://github.com/ggkguelensan/declaratify/tree/main/skills/declaratify-ts)
+к hot-path требованиям DOM/gesture engine: понятность не должна создавать
+лишние allocations или ухудшать runtime cost.
 
 ## 10. Изменения относительно текущей реализации
 
@@ -787,8 +857,15 @@ adapter принимает производный `$shellTarget` и публик
 | Footer вложен в scroll content demo | Footer — отдельная grid row | Footer остаётся у нижней границы |
 | Handle рендерится всегда | Handle отсутствует при `draggable=false` | Content-only состояние нельзя тянуть |
 | DOM binding слушает один Handle | Registry стандартного Handle и custom DragArea | Любая деталь может стать drag initiator |
-| `settle()` не принимает transition token | Sequence-safe completion | Старый promise не завершает новый переход |
+| `settle()` не принимает transition token | Sequence-safe begin/settle/replace/cancel | Старый promise не завершает новый переход |
 | Header/Footer/dragAreas объявлены в DOM types, но не измеряются | Реальное binding и ResizeObserver подключение | Correct content target height |
+| Handle height измеряется отдельно от Header | Handle является частью Header measurement | Исключается double count content height |
+| Pointer move публикует core `drag-updated` | Per-frame state остаётся DOM-local | Effector/React не обновляются на каждом кадре |
+| Velocity выбирает только соседнюю точку по threshold | Projected endpoint + optional sequential mode | Release сохраняет momentum, а sequential policy остаётся явной |
+| Boundary damping линейный | Progressive bounded rubber band | Длинный overscroll не выглядит неограниченным |
+| DOM writes смешаны с measurements | Coalesced measure → mutate → next-frame animate | Нет layout thrash/ResizeObserver feedback |
+| Presentation меняется options/CSS | Measured same-Popup `sheet ↔ dialog` morph | Семантика target и visual layout совпадают без remount |
+| Scroll lock/focus принадлежат одному binding без ownership | Document-scoped reference-counted modality manager | StrictMode и несколько overlays не восстанавливают страницу преждевременно |
 | Demo передаёт `draggable` всегда | Screen policy из Effector view state | Бизнес-логика выбирает поведение |
 | Snap и content могут обновляться разными путями | Atomic external target | Исключение промежуточных неверных кадров |
 | Прикладной flow можно выразить несвязанными полями | Exhaustive discriminated union с `kind` и typed `uiContext` | Невозможные состояния исключаются на уровне TypeScript |
@@ -800,6 +877,39 @@ adapter принимает производный `$shellTarget` и публик
 | Два crossfade-слоя доступны assistive technology | Только один active accessibility layer | Исключаются дублированные controls и labels |
 | Cancelled animation может завершиться rejected Promise | Нормализованный terminal `settled/replaced/cancelled` | Прерывание является обычным сценарием |
 | Тесты зависят от real DOM time | Injected clock/measurement/viewport drivers | Race conditions воспроизводятся детерминированно |
+
+### 10.1. Bottom-up implementation order
+
+Имплементация MUST идти по dependency direction и не начинаться с переписывания
+demo:
+
+1. **Public types and contract fixtures** — atomic target, snapshot,
+   requests/facts, animation result и compile-time generic unions.
+2. **Pure core algorithms** — strict validation, resolution, projected release,
+   sequential policy и rubber band.
+3. **Core controller** — cached snapshots, FIFO publication, tokenized lifecycle,
+   destroy semantics; без DOM fake abstractions.
+4. **DOM foundation** — injectable environment, stable registry, fractional
+   measurements и measure/mutate scheduler.
+5. **DOM visual coordinator** — open/close, geometry и independent regions;
+   затем interruption и content resize.
+6. **DOM interactions/platform** — gestures/native scroll isolation,
+   modality/focus,
+   VisualViewport и measured sheet↔dialog morph.
+7. **Drivers/adapters** — normalized native/Motion drivers, direct Effector
+   binding, compound React API.
+8. **Reference application** — TanStack Start migration и все conformance
+   scenarios, затем browser/a11y/packaging gates.
+
+Каждый номер завершается соответствующими tests до перехода выше. Допускается
+ранний минимальный vertical smoke через vanilla DOM, но верхний adapter не
+копирует отсутствующую lower-layer механику как временную постоянную
+реализацию.
+
+В первой implementation итерации current public API MAY быть временно
+несовместим: package ещё не v1. Предпочтительнее один явно мигрированный target
+contract, чем compatibility branches, которые сохраняют старый controller как
+второй источник поведения.
 
 ## 11. Acceptance criteria
 
@@ -820,14 +930,14 @@ adapter принимает производный `$shellTarget` и публик
 - Изменение Footer key анимирует Footer независимо от Body.
 - Rapid A → B.1 → C не вызывает возврата к высоте A или B.1.
 
-### Controlled authority
+### Target authority
 
-- Imperative `snapTo` не меняет controlled snap point самостоятельно.
+- Imperative `snapTo` не меняет authoritative snap point самостоятельно.
 - Gesture release публикует request, который можно отклонить во внешнем store.
 - Effector может атомарно выбрать B.1 или B.2 вместе с region keys.
 - Snapshot различает `settledSnapPoint` и `targetSnapPoint` во время движения.
 - Отклонённый drag proposal возвращает Popup к authoritative snap point, даже
-  если значение controlled prop не изменилось.
+  если значение target prop не изменилось.
 - `transition-settled` содержит `transitionId` и не принимается за domain event
   более нового перехода.
 
@@ -846,9 +956,13 @@ adapter принимает производный `$shellTarget` и публик
 
 - Footer остаётся у нижней границы во время snap и drag.
 - Body получает внутренний scroll при превышении доступной высоты.
+- Native Body scroll не превращается неявно в sheet drag на boundary.
 - `draggable=false` удаляет Handle и блокирует все drag initiators.
 - Custom DragArea поддерживает pointer capture и не получает click-toggle
   semantics стандартного Handle.
+- Pointer move не публикует core/Effector/React event на каждом frame.
+- Release выбирает projected snap destination; sequential policy ограничивает
+  движение одной соседней физической точкой.
 
 ### Accessibility and motion
 
@@ -868,6 +982,8 @@ adapter принимает производный `$shellTarget` и публик
 - Cancelled driver promise не создаёт unhandled rejection.
 - SSR не требует DOM, hydration не показывает промежуточную геометрию.
 - Один deterministic contract suite проходит для native и Motion drivers.
+- `sheet ↔ dialog` использует тот же Popup, не масштабирует текст и может быть
+  прерван новым target без visual jump.
 
 ## 12. Граница v1
 
@@ -878,8 +994,19 @@ adapter принимает производный `$shellTarget` и публик
 - nested drawer stack;
 - Indent/IndentBackground;
 - edge SwipeArea для открытия;
+- native Body-scroll → sheet-drag handoff в одном touch gesture;
 - VirtualKeyboardProvider как отдельный React primitive;
 - detached trigger payload API.
+
+Также v1 сознательно принимает компромиссы:
+
+- Portal client-attached и не является indexable SSR content;
+- `motion/mini` не обещает velocity-continuous physical spring;
+- styling/common anatomy совместимы с Base UI Drawer, но полный behavioral
+  drop-in (nested/indent/swipe-area) не заявляется;
+- default modality manager не координирует чужой overlay stack без injected
+  application driver;
+- modern browser APIs используются без bundled polyfills.
 
 Эти возможности не должны усложнять главный A → B.x transition protocol до
 его стабилизации.

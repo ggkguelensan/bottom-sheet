@@ -1,164 +1,172 @@
+import type {
+  ShellSheetController,
+  ShellSheetEvent,
+  ShellSheetFact,
+  ShellSheetRequest,
+  ShellSheetSnapshot,
+} from "@shell-sheet/core";
 import {
   createEffect,
   createEvent,
   createStore,
   sample,
+  scopeBind,
+  type Scope,
 } from "effector";
 import type {
-  ShellSheetCloseReason,
-  ShellSheetControlledState,
-  ShellSheetController,
-} from "@shell-sheet/core";
-import type {
-  ShellSheetControllerEventPayload,
   ShellSheetEffectorBinding,
   ShellSheetEffectorOptions,
 } from "./types.js";
 
-export function createShellSheetBinding(
-  options: ShellSheetEffectorOptions,
-): ShellSheetEffectorBinding {
-  const validateState = options.validateState ?? (() => true);
+type Attachment<TSnap extends string, TRegionKey extends string> = {
+  readonly id: number;
+  readonly controller: ShellSheetController<TSnap, TRegionKey>;
+};
 
-  if (!validateState(options.initialState)) {
-    throw new Error("Invalid initial ShellSheet state.");
-  }
-
-  const openRequested = createEvent<void>("shellSheet.openRequested");
-  const closeRequested = createEvent<ShellSheetCloseReason | void>(
-    "shellSheet.closeRequested",
-  );
-  const snapRequested = createEvent<string>("shellSheet.snapRequested");
-  const stateReplaced = createEvent<ShellSheetControlledState>(
-    "shellSheet.stateReplaced",
-  );
-  const controllerAttached = createEvent<ShellSheetController>(
-    "shellSheet.controllerAttached",
-  );
+export function createShellSheetBinding<
+  TSnap extends string,
+  TRegionKey extends string,
+>(
+  options: ShellSheetEffectorOptions<TSnap, TRegionKey>,
+): ShellSheetEffectorBinding<TSnap, TRegionKey> {
+  const controllerAttached = createEvent<
+    ShellSheetController<TSnap, TRegionKey>
+  >("shellSheet.controllerAttached");
   const controllerDetached = createEvent<void>(
     "shellSheet.controllerDetached",
   );
-  const controllerEventReceived =
-    createEvent<ShellSheetControllerEventPayload>(
-      "shellSheet.controllerEventReceived",
-    );
+  const visualSnapshotReceived = createEvent<
+    ShellSheetSnapshot<TSnap, TRegionKey>
+  >("shellSheet.visualSnapshotReceived");
 
-  const $controller = createStore<ShellSheetController | null>(null, {
+  const $controller = createStore<
+    ShellSheetController<TSnap, TRegionKey> | null
+  >(null, {
     name: "shellSheet.$controller",
     serialize: "ignore",
   })
     .on(controllerAttached, (_, controller) => controller)
     .reset(controllerDetached);
-
-  const $state = createStore<ShellSheetControlledState>(
-    options.initialState,
-    { name: "shellSheet.$state" },
-  )
-    .on(openRequested, (state) =>
-      state.open ? state : { ...state, open: true },
-    )
-    .on(closeRequested, (state) =>
-      state.open ? { ...state, open: false } : state,
-    )
-    .on(snapRequested, (state, snapPoint) => {
-      const next = { ...state, snapPoint };
-      if (!validateState(next)) return state;
-      return state.snapPoint === snapPoint ? state : next;
-    })
-    .on(stateReplaced, (state, next) => {
-      if (!validateState(next)) return state;
-      return state.open === next.open && state.snapPoint === next.snapPoint
-        ? state
-        : next;
-    })
-    .on(controllerEventReceived, (state, { event }) => {
-      switch (event.type) {
-        case "open-requested":
-          return state.open ? state : { ...state, open: true };
-        case "close-requested":
-          return state.open ? { ...state, open: false } : state;
-        case "snap-requested": {
-          const next = { ...state, snapPoint: event.snapPoint };
-          return validateState(next) && state.snapPoint !== event.snapPoint
-            ? next
-            : state;
-        }
-        default:
-          return state;
-      }
-    });
-
-  const $open = $state.map((state) => state.open);
-  const $snapPoint = $state.map((state) => state.snapPoint);
-  const $snapshot = createStore<
-    ShellSheetControllerEventPayload["snapshot"] | null
+  const $visualSnapshot = createStore<
+    ShellSheetSnapshot<TSnap, TRegionKey> | null
   >(null, {
-    name: "shellSheet.$snapshot",
+    name: "shellSheet.$visualSnapshot",
     serialize: "ignore",
   })
-    .on(controllerEventReceived, (_, payload) => payload.snapshot)
+    .on(visualSnapshotReceived, (_, snapshot) => snapshot)
     .reset(controllerDetached);
-  const $lastCloseReason = createStore<ShellSheetCloseReason | null>(null, {
-    name: "shellSheet.$lastCloseReason",
-  })
-    .on(closeRequested, (_, reason) => reason || "api")
-    .on(controllerEventReceived, (reason, { event }) =>
-      event.type === "close-requested" ? event.reason : reason,
-    );
 
   const syncControllerFx = createEffect<
-    {
-      controller: ShellSheetController;
-      state: ShellSheetControlledState;
-    },
+    Readonly<{
+      controller: ShellSheetController<TSnap, TRegionKey>;
+      target: ReturnType<typeof options.$target.getState>;
+    }>,
     void,
     Error
   >({
     name: "shellSheet.syncControllerFx",
-    handler: ({ controller, state }) => controller.sync(state),
-  });
-
-  sample({
-    clock: $state,
-    source: $controller,
-    filter: (controller) => controller !== null,
-    fn: (controller, state) => ({ controller: controller!, state }),
-    target: syncControllerFx,
+    handler: ({ controller, target }) => controller.sync(target),
   });
 
   sample({
     clock: controllerAttached,
-    source: $state,
-    fn: (state, controller) => ({ controller, state }),
+    source: options.$target,
+    fn: (target, controller) => ({ controller, target }),
+    target: syncControllerFx,
+  });
+  sample({
+    clock: options.$target,
+    source: $controller,
+    filter: (controller) => controller !== null,
+    fn: (controller, target) => {
+      if (controller === null) {
+        throw new Error("ShellSheet controller disappeared during target sync.");
+      }
+      return { controller, target };
+    },
     target: syncControllerFx,
   });
 
-  return {
-    $state,
-    $open,
-    $snapPoint,
-    $controller,
-    $snapshot,
-    $lastCloseReason,
-    openRequested,
-    closeRequested,
-    snapRequested,
-    stateReplaced,
+  let attachmentId = 0;
+  let globalAttachment: Attachment<TSnap, TRegionKey> | null = null;
+  const scopeAttachments = new WeakMap<
+    Scope,
+    Attachment<TSnap, TRegionKey>
+  >();
+
+  const attach = (
+    controller: ShellSheetController<TSnap, TRegionKey>,
+    scope?: Scope,
+  ): (() => void) => {
+    const existing = scope
+      ? scopeAttachments.get(scope) ?? null
+      : globalAttachment;
+    if (existing) {
+      throw new Error(
+        "ShellSheet Effector binding already has an attached controller in this scope.",
+      );
+    }
+
+    attachmentId += 1;
+    const attachment: Attachment<TSnap, TRegionKey> = {
+      id: attachmentId,
+      controller,
+    };
+    if (scope) scopeAttachments.set(scope, attachment);
+    else globalAttachment = attachment;
+
+    const sendAttached = scope
+      ? scopeBind(controllerAttached, { scope })
+      : controllerAttached;
+    const sendDetached = scope
+      ? scopeBind(controllerDetached, { scope })
+      : controllerDetached;
+    const sendSnapshot = scope
+      ? scopeBind(visualSnapshotReceived, { scope })
+      : visualSnapshotReceived;
+    const sendRequest = scope
+      ? scopeBind(options.requestReceived, { scope })
+      : options.requestReceived;
+    const sendFact = scope
+      ? scopeBind(options.visualFactReceived, { scope })
+      : options.visualFactReceived;
+
+    const unsubscribe = controller.subscribe((snapshot, event) => {
+      sendSnapshot(snapshot);
+      if (isRequest(event)) sendRequest(event);
+      else sendFact(event);
+    });
+    sendAttached(controller);
+
+    let active = true;
+    return () => {
+      if (!active) return;
+      active = false;
+      const current = scope
+        ? scopeAttachments.get(scope) ?? null
+        : globalAttachment;
+      if (current?.id !== attachment.id) return;
+      unsubscribe();
+      if (scope) scopeAttachments.delete(scope);
+      else globalAttachment = null;
+      sendDetached();
+    };
+  };
+
+  return Object.freeze({
     controllerAttached,
     controllerDetached,
-    controllerEventReceived,
+    $controller,
+    $visualSnapshot,
     syncControllerFx,
-    attach(controller) {
-      const unsubscribe = controller.subscribe((snapshot, event) => {
-        controllerEventReceived({ controller, snapshot, event });
-      });
-
-      controllerAttached(controller);
-
-      return () => {
-        unsubscribe();
-        controllerDetached();
-      };
-    },
-  };
+    attach: (controller) => attach(controller),
+    attachInScope: (controller, scope) => attach(controller, scope),
+  });
 }
+
+const isRequest = <TSnap extends string, TRegionKey extends string>(
+  event: ShellSheetEvent<TSnap, TRegionKey>,
+): event is ShellSheetRequest<TSnap> =>
+  event.type === "open-requested" ||
+  event.type === "close-requested" ||
+  event.type === "snap-requested";

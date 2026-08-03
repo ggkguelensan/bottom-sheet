@@ -161,14 +161,26 @@ test("Arkham uses one animated, non-draggable Popup and rejects stale async comp
   await expect(page.locator("[data-region='body'][data-layer='incoming']")).toHaveCount(1);
   const incomingBody = page.locator("[data-region='body'][data-layer='incoming']");
   const outgoingBody = page.locator("[data-region='body'][data-layer='outgoing']");
+  const bodyBlurSurface = page.locator("[data-region-blur='body']");
   await expect.poll(async () => {
     const frames = await activeKeyframes(incomingBody);
     return frames.some((frame) => Number(frame.opacity) === 0) &&
-      frames.some((frame) => String(frame.filter).includes("blur(2px)"));
+      frames.some((frame) => Number(frame.opacity) === 1);
   }).toBe(true);
   await expect.poll(async () =>
     (await activeKeyframes(outgoingBody)).some((frame) => Number(frame.opacity) === 0),
   ).toBe(true);
+  await expect(bodyBlurSurface).toHaveAttribute("aria-hidden", "true");
+  await expect(bodyBlurSurface).toHaveCSS("pointer-events", "none");
+  await expect.poll(async () => {
+    const frames = await activeKeyframes(bodyBlurSurface);
+    const middle = frames.find((frame) => frame.computedOffset === 0.5);
+    return Boolean(
+      middle &&
+      Number(middle.opacity) === 1 &&
+      String(middle.backdropFilter).includes("blur(2px)"),
+    );
+  }).toBe(true);
   await expect(page.locator("[data-region='header'][data-layer='outgoing']")).toHaveCount(0);
   await expect(page.locator("[data-region='footer'][data-layer='outgoing']")).toHaveCount(1);
   await expect(page.locator("[data-region='body'][data-layer='outgoing']")).toHaveCount(0);

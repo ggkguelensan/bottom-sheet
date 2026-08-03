@@ -46,6 +46,10 @@ export type ShellSheetRegistry<TKey extends string> = Readonly<{
     layer: ShellRegionLayer<TKey>,
     element: HTMLElement,
   ): () => void;
+  registerRegionTransitionSurface(
+    region: ShellRegionName,
+    element: HTMLElement,
+  ): () => void;
   registerDragArea(
     element: HTMLElement,
     options?: DragAreaOptions,
@@ -63,10 +67,12 @@ export function createShellSheetRegistry<TKey extends string>(
     Map<ShellRegionLayerName, LayerEntry<TKey>>
   >();
   const dragAreas = new Map<number, DragEntry>();
+  const transitionSurfaces = new Map<ShellRegionName, PartEntry>();
   let token = 0;
   let snapshot: ShellSheetRegistrySnapshot<TKey> = Object.freeze({
     elements: emptyElements(),
     regionLayers: new Map(),
+    regionTransitionSurfaces: new Map(),
     dragAreas: Object.freeze([]),
   });
 
@@ -88,6 +94,7 @@ export function createShellSheetRegistry<TKey extends string>(
     snapshot = Object.freeze({
       elements: Object.freeze(elements),
       regionLayers,
+      regionTransitionSurfaces: new Map(transitionSurfaces),
       dragAreas: Object.freeze([...dragAreas.values()]),
     });
     onChange();
@@ -132,6 +139,20 @@ export function createShellSheetRegistry<TKey extends string>(
         rebuild();
       };
     },
+    registerRegionTransitionSurface(region, element) {
+      token += 1;
+      const registrationToken = token;
+      transitionSurfaces.set(region, { element, token: registrationToken });
+      rebuild();
+      let active = true;
+      return () => {
+        if (!active) return;
+        active = false;
+        if (transitionSurfaces.get(region)?.token !== registrationToken) return;
+        transitionSurfaces.delete(region);
+        rebuild();
+      };
+    },
     registerDragArea(element, options) {
       token += 1;
       const registrationToken = token;
@@ -153,10 +174,12 @@ export function createShellSheetRegistry<TKey extends string>(
     clear() {
       parts.clear();
       layers.clear();
+      transitionSurfaces.clear();
       dragAreas.clear();
       snapshot = Object.freeze({
         elements: emptyElements(),
         regionLayers: new Map(),
+        regionTransitionSurfaces: new Map(),
         dragAreas: Object.freeze([]),
       });
     },

@@ -18,8 +18,9 @@ Shell Sheet — не просто drawer, modal или набор React-слот
 2. Shell Sheet исчезает с анимацией; текущий контент сохраняется до её конца.
 3. При смене состояния геометрия Shell Sheet изменяется с анимацией.
 4. Старый и новый контент изменившегося региона временно существуют
-   одновременно и переходят друг в друга через opacity, небольшой spatial
-   offset и blur.
+   одновременно и переходят друг в друга через opacity. Отдельная blur-surface
+   лежит поверх обоих слоёв и достигает максимального blur ровно в середине
+   перехода.
 5. Header, Body и Footer являются независимыми регионами. Неизменившийся
    регион не дублируется, не размывается и не теряет DOM-состояние.
 6. Целевой snap point выбирает внешний источник истины. Shell Sheet не выводит
@@ -387,8 +388,10 @@ token получает ровно один terminal fact.
    styles.
 7. В следующем кадре одновременно запускаются:
    - изменение высоты Popup от A к B.1;
-   - outgoing → transparent/blurred для изменившихся регионов;
-   - incoming → opaque/sharp для изменившихся регионов.
+   - outgoing opacity `1 → 0` для изменившихся регионов;
+   - incoming opacity `0 → 1` для изменившихся регионов;
+   - отдельная transition-surface поверх обоих слоёв проходит
+     `blur(0) → blur(2px) → blur(0)` с пиком на `offset: 0.5`.
 8. После завершения outgoing-слои удаляются, target становится settled.
 
 Высота рассчитывается для B.1, а не просто для «контента B»:
@@ -515,7 +518,7 @@ V1 driver defaults (consumer меняет их documented CSS timing tokens):
 | Open | 280 ms | `cubic-bezier(0.32, 0.72, 0, 1)` | transform, backdrop opacity |
 | Close | 220 ms | `cubic-bezier(0.32, 0.72, 0, 1)` | transform, backdrop opacity |
 | Snap/geometry | 260–280 ms | strong ease-in-out/drawer curve | isolated Popup height |
-| Region transition | 220 ms | strong ease-in-out | opacity, transform 6–12 px, blur 2 px |
+| Region transition | 220 ms | strong ease-in-out | layer opacity + overlay backdrop blur 0→2→0 px |
 
 Driver — единственный clock для geometry, Backdrop progress и region motion.
 Consumer CSS задаёт target appearance/timing tokens, но не запускает вторую CSS
@@ -527,9 +530,8 @@ Default spatial models:
   позиции, Backdrop меняет opacity;
 - dialog opening/closing использует opacity + 12 px vertical offset без scale
   текста;
-- region forward/backward offset имеет противоположный знак, `replace` не
-  придумывает navigation direction, `snap` с неизменными keys не трогает
-  regions;
+- `replace` не придумывает navigation direction, `snap` с неизменными keys не
+  трогает regions;
 - `motion: "instant"` — единственный application-requested путь без animation;
   reduced motion применяет отдельную policy ниже.
 
@@ -539,7 +541,7 @@ Default spatial models:
 
 При `prefers-reduced-motion`:
 
-- spatial transform регионов и blur отключаются;
+- blur-surface отключается, короткий opacity crossfade сохраняется;
 - open/close используют короткий opacity transition до 120 ms;
 - geometry принимает target без продолжительного пространственного движения;
 - смысл перехода и порядок focus/inert lifecycle сохраняются.
@@ -967,7 +969,8 @@ contract, чем compatibility branches, которые сохраняют ст�
 ### Coordinated state transitions
 
 - A → B.1: target height соответствует B.1, outgoing/incoming Body одновременно
-  присутствуют во время blur transition.
+  присутствуют во время opacity crossfade, а отдельная Body blur-surface
+  перекрывает их и достигает пика в середине transition.
 - Если Header/Footer keys не изменились, в DOM существует по одному экземпляру
   этих регионов и blur на них отсутствует.
 - B.1 → B.2 с тем же region key анимирует только геометрию.
@@ -1012,7 +1015,8 @@ contract, чем compatibility branches, которые сохраняют ст�
 
 - Modal focus trap, inert, scroll lock, Escape и focus restoration сохраняются.
 - Non-modal presentation не блокирует background content.
-- Reduced motion исключает spatial/blur эффекты, но сохраняет понятный lifecycle.
+- Reduced motion отключает region blur-surface, но сохраняет короткий opacity
+  crossfade и понятный lifecycle.
 - Title/Description корректно связываются с dialog semantics.
 - Во время crossfade только active layer доступен screen reader и keyboard.
 - Focus внутри заменяемого региона переносится предсказуемо до удаления
@@ -1061,7 +1065,8 @@ contract, чем compatibility branches, которые сохраняют ст�
 автоматическими unit/integration tests, а demo визуально демонстрирует:
 
 1. Animated open и close.
-2. A → B.1 с одновременным geometry и Body blur transition.
+2. A → B.1 с одновременным geometry, Body opacity crossfade и отдельной
+   midpoint-peaked Body blur-surface.
 3. B.1 → B.2, выбранный Effector, с корректным snap motion.
 4. Неизменившийся Footer без blur и без remount.
 5. Изменившийся Footer с независимым transition.

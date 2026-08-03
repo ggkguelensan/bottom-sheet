@@ -170,6 +170,9 @@ const registerAnatomy = (
   const bodyLayer = element("div", 320);
   Object.defineProperty(bodyLayer, "scrollHeight", { value: 320 });
   const footerLayer = element("div", 72);
+  const headerTransitionSurface = element("div", 40);
+  const bodyTransitionSurface = element("div", 320);
+  const footerTransitionSurface = element("div", 72);
 
   const cleanups = [
     binding.registerPart("portal", portal),
@@ -197,15 +200,18 @@ const registerAnatomy = (
       { key: "actions", layer: "settled" },
       footerLayer,
     ),
+    binding.registerRegionTransitionSurface("header", headerTransitionSurface),
+    binding.registerRegionTransitionSurface("body", bodyTransitionSurface),
+    binding.registerRegionTransitionSurface("footer", footerTransitionSurface),
   ];
   document.body.append(portal, inertTarget);
   portal.append(backdrop, viewport);
   viewport.append(popup);
   popup.append(content);
   content.append(header, body, footer);
-  header.append(handle, headerLayer);
-  body.append(bodyLayer);
-  footer.append(footerLayer);
+  header.append(handle, headerLayer, headerTransitionSurface);
+  body.append(bodyLayer, bodyTransitionSurface);
+  footer.append(footerLayer, footerTransitionSurface);
 
   return {
     portal,
@@ -221,6 +227,9 @@ const registerAnatomy = (
     headerLayer,
     bodyLayer,
     footerLayer,
+    headerTransitionSurface,
+    bodyTransitionSurface,
+    footerTransitionSurface,
     cleanups,
   };
 };
@@ -614,6 +623,7 @@ describe("target DOM binding", () => {
     expect(animatedElements).toContain(anatomy.popup);
     expect(animatedElements).toContain(anatomy.bodyLayer);
     expect(animatedElements).toContain(incoming);
+    expect(animatedElements).toContain(anatomy.bodyTransitionSurface);
     expect(animatedElements).not.toContain(anatomy.headerLayer);
     expect(animatedElements).not.toContain(anatomy.footerLayer);
     expect(document.activeElement).toBe(anatomy.popup);
@@ -627,8 +637,6 @@ describe("target DOM binding", () => {
       easing: "cubic-bezier(0.65, 0, 0.35, 1)",
       keyframes: {
         opacity: [0, 1],
-        filter: ["blur(2px)", "blur(0px)"],
-        transform: ["translateY(8px)", "translateY(0px)"],
       },
     });
     const outgoingTransition = harness.calls.find(
@@ -639,9 +647,31 @@ describe("target DOM binding", () => {
       easing: "cubic-bezier(0.65, 0, 0.35, 1)",
       keyframes: {
         opacity: [1, 0],
-        filter: ["blur(0px)", "blur(2px)"],
-        transform: ["translateY(0px)", "translateY(-8px)"],
       },
+    });
+    const blurTransition = harness.calls.find(
+      (call) => call.element === anatomy.bodyTransitionSurface,
+    );
+    expect(blurTransition).toMatchObject({
+      duration: 220,
+      easing: "cubic-bezier(0.65, 0, 0.35, 1)",
+      keyframes: [
+        {
+          offset: 0,
+          opacity: 0,
+          backdropFilter: "blur(0px)",
+        },
+        {
+          offset: 0.5,
+          opacity: 1,
+          backdropFilter: "blur(2px)",
+        },
+        {
+          offset: 1,
+          opacity: 0,
+          backdropFilter: "blur(0px)",
+        },
+      ],
     });
 
     binding.destroy();
@@ -777,9 +807,12 @@ describe("target DOM binding", () => {
     ).toBe(true);
 
     anatomy.bodyLayer.style.opacity = "0.55";
-    anatomy.bodyLayer.style.filter = "blur(0.9px)";
     details.style.opacity = "0.45";
-    details.style.filter = "blur(1.1px)";
+    anatomy.bodyTransitionSurface.style.opacity = "0.75";
+    anatomy.bodyTransitionSurface.style.setProperty(
+      "backdrop-filter",
+      "blur(0.8px)",
+    );
     const cStart = deferred.length;
     controller.sync(opened("C", "summary"));
     await flushAll(harness.frames);
@@ -798,6 +831,18 @@ describe("target DOM binding", () => {
       (call) => call.element === anatomy.bodyLayer,
     );
     expect(restoredSummary?.keyframes).toMatchObject({ opacity: [0.55, 1] });
+    const continuedBlur = cCalls.find(
+      (call) => call.element === anatomy.bodyTransitionSurface,
+    );
+    expect(continuedBlur?.keyframes).toMatchObject([
+      {
+        offset: 0,
+        opacity: 0.75,
+        backdropFilter: "blur(0.8px)",
+      },
+      { offset: 0.5, opacity: 1, backdropFilter: "blur(2px)" },
+      { offset: 1, opacity: 0, backdropFilter: "blur(0px)" },
+    ]);
     const cTransitionId = controller.getSnapshot().transitionId;
 
     for (const call of [...bCalls, ...bRetargetCalls]) {

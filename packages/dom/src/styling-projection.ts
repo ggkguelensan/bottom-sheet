@@ -81,6 +81,15 @@ export const applyStructuralMechanics = <TRegionKey extends string>(
       layer.element.style.alignSelf = "start";
     }
   }
+  for (const [region, surface] of registry.regionTransitionSurfaces) {
+    surface.element.dataset.regionBlur = region;
+    surface.element.style.gridArea = region === "header" ? "2 / 1" : "1 / 1";
+    surface.element.style.alignSelf = "stretch";
+    surface.element.style.justifySelf = "stretch";
+    surface.element.style.zIndex = "1";
+    surface.element.style.pointerEvents = "none";
+    surface.element.setAttribute("aria-hidden", "true");
+  }
 };
 
 const highestPhysicalPoint = <TSnap extends string>(

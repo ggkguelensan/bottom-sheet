@@ -44,8 +44,15 @@ export function createMotionAnimationDriver(): ShellAnimationDriver {
         stop() {
           if (stopped) return;
           stopped = true;
-          if (native) (controls as Animation).cancel();
-          else (controls as ReturnType<typeof animate>).stop();
+          try {
+            if (native) (controls as Animation).cancel();
+            else (controls as ReturnType<typeof animate>).stop();
+          } catch {
+            // motion/mini commits current styles before cancelling. Browsers
+            // throw InvalidStateError if React detached the target between the
+            // coordinator read and stop. Driver cleanup is best-effort and
+            // must remain idempotent even when its target is already detached.
+          }
         },
       };
     },

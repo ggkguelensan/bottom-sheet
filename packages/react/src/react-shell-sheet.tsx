@@ -1160,6 +1160,36 @@ const RegionLayerView = ({
   );
 };
 
+const RegionTransitionSurface = ({
+  region,
+}: {
+  region: "header" | "body" | "footer";
+}) => {
+  const { binding } = useShellSheet();
+  const cleanupRef = useRef<(() => void) | null>(null);
+  const ref = useCallback(
+    (element: HTMLDivElement | null) => {
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+      if (element && binding) {
+        cleanupRef.current = binding.registerRegionTransitionSurface(
+          region,
+          element,
+        );
+      }
+    },
+    [binding, region],
+  );
+
+  return (
+    <div
+      ref={ref}
+      data-region-blur={region}
+      aria-hidden="true"
+    />
+  );
+};
+
 const createRegion = (region: "body" | "footer") =>
   forwardRef<HTMLDivElement, RegionProps>(function Region(
     {
@@ -1211,6 +1241,7 @@ const createRegion = (region: "body" | "footer") =>
             >
               {layers.current.node}
             </RegionLayerView>
+            <RegionTransitionSurface region={region} />
           </>
         ),
       },
@@ -1342,6 +1373,7 @@ export const ShellSheetHeader = forwardRef<HTMLDivElement, RegionProps>(
             >
               {layers.current.node}
             </RegionLayerView>
+            <RegionTransitionSurface region="header" />
           </>
         ),
       },

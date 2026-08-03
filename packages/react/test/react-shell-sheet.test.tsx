@@ -366,6 +366,10 @@ describe("ShellSheet React adapter", () => {
     await flushVisuals(test.frames);
     const header = portal.querySelector("[data-region='header']");
     const footer = portal.querySelector("[data-region='footer']");
+    const bodyTransitionSurface = portal.querySelector(
+      "[data-region-blur='body']",
+    );
+    expect(bodyTransitionSurface?.getAttribute("aria-hidden")).toBe("true");
 
     await act(async () =>
       root.render(render(target("B", { body: "b" }), "Innsmouth")),
@@ -382,6 +386,10 @@ describe("ShellSheet React adapter", () => {
     ).toBe("true");
     expect(portal.querySelector("[data-region='header']")).toBe(header);
     expect(portal.querySelector("[data-region='footer']")).toBe(footer);
+    expect(portal.querySelectorAll("[data-region-blur='body']")).toHaveLength(1);
+    expect(portal.querySelector("[data-region-blur='body']")).toBe(
+      bodyTransitionSurface,
+    );
 
     await flushVisuals(test.frames);
     expect(portal.querySelectorAll("[data-region='body']")).toHaveLength(1);

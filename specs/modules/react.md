@@ -177,6 +177,9 @@ mode является development error.
 
 - Same key + preserve сохраняет один subtree и focus/local state.
 - Changed key монтирует outgoing/incoming одновременно.
+- Каждый region host постоянно содержит отдельную non-semantic
+  transition-surface, зарегистрированную в DOM adapter. Она лежит поверх двух
+  content layers и не дублирует application content.
 - Region не запускает timer; DOM coordinator запускает все changed regions
   вместе с Popup geometry.
 - Standard Handle находится внутри Header host, но вне Header transition layer.

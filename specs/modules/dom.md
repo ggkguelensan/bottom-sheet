@@ -31,6 +31,10 @@ type ShellSheetDomBinding<TSnap extends string, TRegionKey extends string> = {
     layer: ShellRegionLayer<TRegionKey>,
     element: HTMLElement,
   ): () => void;
+  registerRegionTransitionSurface(
+    region: "header" | "body" | "footer",
+    element: HTMLElement,
+  ): () => void;
   registerDragArea(element: HTMLElement, options?: DragAreaOptions): () => void;
   setInsets(insets: ShellSheetInsets): void;
   refresh(): void;
@@ -286,7 +290,8 @@ idle → preparing → animating → settling → idle
 9. очищает outgoing/transient state после settle или replacement.
 
 Новый target, resize или presentation change прерывает attempt. Следующий plan
-стартует от фактически видимой computed geometry/opacity/blur, а не от старого
+стартует от фактически видимой computed geometry, layer opacity и blur-surface,
+а не от старого
 settled target. Старый attempt получает ровно один `replaced`; его поздний
 completion ничего не меняет.
 
@@ -303,9 +308,11 @@ prepare → apply target → `transition-settled`. Они не являются 
 Каждый region plan независим:
 
 - `preserve` — key MUST совпадать; существует один и тот же subtree, без
-  opacity/blur transition;
-- `crossfade` — outgoing и incoming одновременно существуют; opacity, small
-  directional offset и bounded blur меняются одновременно;
+  opacity crossfade и без blur-surface animation;
+- `crossfade` — outgoing и incoming одновременно существуют; outgoing меняет
+  opacity `1→0`, incoming `0→1`. Отдельная зарегистрированная transition-surface
+  располагается поверх обоих слоёв и анимирует `backdrop-filter` по трём
+  keyframes: `blur(0)` на 0%, `blur(2px)` на 50%, `blur(0)` на 100%;
 - `replace` — outgoing сохраняется, пока incoming измерим; в start frame
   происходит semantic swap без crossfade, geometry Popup MAY анимироваться.
 
@@ -315,6 +322,9 @@ Semantic direction приходит из target intent. DOM не выводит 
 Только изменившиеся region keys переходят. Если A→B меняет Body, Header и
 Footer остаются теми же DOM nodes и не blur-анимируются. Outgoing/inactive
 layers получают `inert`, `aria-hidden="true"` и не участвуют в tab order.
+Transition-surface всегда `aria-hidden`, не получает focus, имеет
+`pointer-events:none` и не участвует в measurement/layout target. При
+interruption новый blur plan стартует с её текущего computed visual state.
 
 Body overflow может появиться после выбора snap. При
 `contentResizeBehavior`:

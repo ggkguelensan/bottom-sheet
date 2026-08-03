@@ -93,6 +93,23 @@ describe("Motion mini driver", () => {
     await expect(rejected.finished).resolves.toEqual({ status: "cancelled" });
   });
 
+  it("treats a detached-target InvalidStateError as completed cleanup", () => {
+    motion.animate.mockReturnValueOnce({
+      finished: new Promise<void>(() => undefined),
+      stop: vi.fn(() => {
+        throw new DOMException("Target element is not rendered.", "InvalidStateError");
+      }),
+    });
+    const controls = createMotionAnimationDriver().animate(
+      {} as HTMLElement,
+      { opacity: [1, 0] },
+      { durationMs: 180, easing: "ease-out" },
+    );
+
+    expect(() => controls.stop()).not.toThrow();
+    expect(() => controls.stop()).not.toThrow();
+  });
+
   it("imports only motion/mini", () => {
     const source = readFileSync(
       new URL("../src/index.ts", import.meta.url),

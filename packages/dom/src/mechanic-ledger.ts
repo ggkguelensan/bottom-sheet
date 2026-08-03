@@ -89,6 +89,7 @@ const partAttributes: Record<ShellSheetPart, readonly string[]> = {
 export type ShellSheetMechanicLedger = Readonly<{
   capturePart(part: ShellSheetPart, element: HTMLElement): void;
   captureRegionLayer(element: HTMLElement): void;
+  captureRegionTransitionSurface(element: HTMLElement): void;
   restoreAll(): void;
 }>;
 
@@ -140,6 +141,22 @@ export const createMechanicLedger = (): ShellSheetMechanicLedger => {
           "aria-hidden",
           "inert",
         ],
+      );
+    },
+    captureRegionTransitionSurface(element) {
+      capture(
+        element,
+        [
+          "align-self",
+          "grid-area",
+          "justify-self",
+          "z-index",
+          "pointer-events",
+          "opacity",
+          "backdrop-filter",
+          "-webkit-backdrop-filter",
+        ],
+        ["data-region-blur", "aria-hidden"],
       );
     },
     restoreAll() {

@@ -135,6 +135,10 @@ export type ShellSheetDomBinding<
     layer: ShellRegionLayer<TRegionKey>,
     element: HTMLElement,
   ): () => void;
+  registerRegionTransitionSurface(
+    region: ShellRegionName,
+    element: HTMLElement,
+  ): () => void;
   registerDragArea(
     element: HTMLElement,
     options?: DragAreaOptions,
@@ -155,6 +159,10 @@ export type ShellSheetRegistrySnapshot<TRegionKey extends string = string> =
         element: HTMLElement;
         token: number;
       }>>
+    >;
+    regionTransitionSurfaces: ReadonlyMap<
+      ShellRegionName,
+      Readonly<{ element: HTMLElement; token: number }>
     >;
     dragAreas: readonly Readonly<{
       element: HTMLElement;

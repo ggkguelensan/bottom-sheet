@@ -280,6 +280,7 @@ Shell-specific alias; оба атрибута имеют одинаковый р
 
 - `data-region="header|body|footer"`;
 - `data-layer="settled|outgoing|incoming"`;
+- `data-region-blur="header|body|footer"` на отдельной blur transition-surface;
 - `data-active` на active layer;
 - `data-starting-style` на incoming layer;
 - `data-ending-style` на outgoing layer;
@@ -379,7 +380,8 @@ projection и Shell timing tokens:
 ```
 
 Driver является единственным владельцем animation для Popup transform/size,
-Backdrop progress и region opacity/blur/offset. Consumer MUST NOT добавлять CSS
+Backdrop progress, region layer opacity и transition-surface backdrop blur.
+Consumer MUST NOT добавлять CSS
 transition/animation этих же mechanics properties: это создаёт второй clock и
 ломает interruption/terminal ordering. During animation inline mechanic value
 имеет приоритет; после settle adapter удаляет его, а Base variables/stable CSS

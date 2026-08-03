@@ -327,6 +327,12 @@ export function bindShellSheetToDom<
       const cleanup = registry.registerRegionLayer(region, layer, element);
       return () => cleanup();
     },
+    registerRegionTransitionSurface(region, element) {
+      ensureActive();
+      mechanicLedger.captureRegionTransitionSurface(element);
+      const cleanup = registry.registerRegionTransitionSurface(region, element);
+      return () => cleanup();
+    },
     registerDragArea(element, dragOptions) {
       ensureActive();
       const cleanup = registry.registerDragArea(element, dragOptions);

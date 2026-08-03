@@ -90,10 +90,12 @@ A content change is a state transition, not a DOM replacement:
 3. Measure outgoing and incoming geometry.
 4. Animate the isolated content wrapper from the old measured height to the new
    height.
-5. Crossfade the layers with an 8–12 px directional offset and at most 2 px of
-   blur.
-6. Remove the outgoing layer only after the transition settles.
-7. If a new request arrives, cancel the previous completion and transition to
+5. Crossfade the content layers only through opacity: outgoing `1 → 0`, incoming
+   `0 → 1`.
+6. Place a separate non-interactive blur surface over both layers and animate it
+   `blur(0) → blur(2px) → blur(0)`, with the strongest blur at 50%.
+7. Remove the outgoing layer only after the transition settles.
+8. If a new request arrives, cancel the previous completion and transition to
    the latest requested key.
 
 Motion follows the installed Emil Kowalski design rules:
@@ -103,8 +105,7 @@ Motion follows the installed Emil Kowalski design rules:
 - no interaction uses ease-in;
 - active buttons scale to `0.97` for 120 ms;
 - hover motion is gated by fine-pointer capability;
-- reduced motion keeps a short opacity transition but removes spatial blur and
-  movement;
+- reduced motion keeps a short opacity transition but disables the blur surface;
 - animated height is an intentional, contained exception because measured
   adaptive geometry is the behavior under test. The surface uses layout/paint
   containment so it does not reflow the scene.
@@ -182,7 +183,8 @@ surfaces.
 
 Mechanic selectors use public `data-open`, `data-starting-style`,
 `data-ending-style`, `data-swiping` and `--drawer-*` values. Shell-specific
-region transitions use only the documented `data-region/data-layer` and
+region transitions use only the documented `data-region/data-layer`,
+`data-region-blur` and
 `--shell-sheet-*` extensions.
 
 ## 8. Canonical composition

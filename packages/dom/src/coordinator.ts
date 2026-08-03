@@ -64,8 +64,12 @@ type ActiveAttempt<TSnap extends string, TRegionKey extends string> = {
 
 type LayerVisual = Readonly<{
   opacity: string;
-  filter: string;
-  transform: string;
+  continuing: boolean;
+}>;
+
+type TransitionSurfaceVisual = Readonly<{
+  opacity: string;
+  backdropFilter: string;
   continuing: boolean;
 }>;
 
@@ -152,18 +156,14 @@ const readTiming = (
   };
 };
 
-const directionOffset = (
-  target: ShellSheetOpenTarget<string, string>,
-): number => {
-  if (target.transition.direction === "forward") return 8;
-  if (target.transition.direction === "backward") return -8;
-  return 0;
-};
-
 const clearLayerMechanics = (element: HTMLElement): void => {
   element.style.removeProperty("opacity");
-  element.style.removeProperty("filter");
-  element.style.removeProperty("transform");
+};
+
+const clearTransitionSurfaceMechanics = (element: HTMLElement): void => {
+  element.style.removeProperty("opacity");
+  element.style.removeProperty("backdrop-filter");
+  element.style.removeProperty("-webkit-backdrop-filter");
 };
 
 const GEOMETRY_EPSILON = 0.5;
@@ -182,6 +182,7 @@ export function createTransitionCoordinator<
   let currentHeight: number | null = null;
   let openingPrepared = false;
   const transitioningRegionLayers = new WeakSet<HTMLElement>();
+  const transitioningRegionSurfaces = new WeakSet<HTMLElement>();
   const warnedTiming = new Set<string>();
   const warnInvalidTiming = (property: string, value: string): void => {
     const signature = `${property}:${value}`;
@@ -208,6 +209,10 @@ export function createTransitionCoordinator<
   ): void => {
     if (destroyed || active !== attempt) return;
     active = null;
+    // A finished WAAPI animation with fill:"both" remains discoverable through
+    // getAnimations(). Release every clock while its target is still mounted;
+    // the cleanup below then removes the temporary inline mechanic values.
+    for (const controls of attempt.controls) controls.stop();
     attempt.cleanup();
     currentHeight = geometry.targetHeight;
     options.controller.settleTransition(attempt.transitionId);
@@ -241,11 +246,9 @@ export function createTransitionCoordinator<
     controls: ShellAnimationControls[],
     cleanups: Array<() => void>,
     currentVisuals: ReadonlyMap<HTMLElement, LayerVisual>,
+    currentSurfaceVisuals: ReadonlyMap<HTMLElement, TransitionSurfaceVisual>,
   ): void => {
     if (!previous) return;
-    const offset = directionOffset(
-      target as ShellSheetOpenTarget<string, string>,
-    );
 
     for (const region of ["header", "body", "footer"] as const) {
       const targetRegion = target.regions[region];
@@ -261,53 +264,24 @@ export function createTransitionCoordinator<
       const outgoing = findRegionLayer(registry, region, previousRegion.key);
       if (!incoming || !outgoing) continue;
       const actualDuration = target.transition.motion === "instant" ? 0 : durationMs;
-      const incomingOffset = reduceMotion ? 0 : offset;
-      const outgoingOffset = reduceMotion ? 0 : -offset;
       const incomingCurrent = currentVisuals.get(incoming);
       const outgoingCurrent = currentVisuals.get(outgoing);
       const incomingOpacity = incomingCurrent?.continuing
         ? incomingCurrent.opacity || "0"
         : "0";
-      const incomingFilter = incomingCurrent?.continuing
-        ? incomingCurrent.filter || (reduceMotion ? "none" : "blur(2px)")
-        : reduceMotion ? "none" : "blur(2px)";
-      const incomingTransform = incomingCurrent?.continuing
-        ? incomingCurrent.transform === "none"
-          ? "translateY(0px)"
-          : incomingCurrent.transform || `translateY(${incomingOffset}px)`
-        : `translateY(${incomingOffset}px)`;
       const outgoingOpacity = outgoingCurrent?.continuing
         ? outgoingCurrent.opacity || "1"
         : "1";
-      const outgoingFilter = outgoingCurrent?.continuing
-        ? outgoingCurrent.filter || "blur(0px)"
-        : "blur(0px)";
-      const outgoingTransform = outgoingCurrent?.continuing
-        ? outgoingCurrent.transform === "none"
-          ? "translateY(0px)"
-          : outgoingCurrent.transform || "translateY(0px)"
-        : "translateY(0px)";
       transitioningRegionLayers.add(incoming);
       transitioningRegionLayers.add(outgoing);
       incoming.style.opacity = incomingOpacity;
-      incoming.style.filter = incomingFilter;
-      incoming.style.transform = incomingTransform;
       outgoing.style.opacity = outgoingOpacity;
-      outgoing.style.filter = outgoingFilter;
-      outgoing.style.transform = outgoingTransform;
 
       controls.push(
         options.animation.animate(
           incoming,
           {
             opacity: [Number(incomingOpacity), 1],
-            filter: reduceMotion
-              ? ["none", "none"]
-              : [incomingFilter, "blur(0px)"],
-            transform: [
-              incomingTransform,
-              "translateY(0px)",
-            ],
           },
           { durationMs: actualDuration, easing },
         ),
@@ -317,13 +291,6 @@ export function createTransitionCoordinator<
           outgoing,
           {
             opacity: [Number(outgoingOpacity), 0],
-            filter: reduceMotion
-              ? ["none", "none"]
-              : [outgoingFilter, "blur(2px)"],
-            transform: [
-              outgoingTransform,
-              `translateY(${outgoingOffset}px)`,
-            ],
           },
           { durationMs: actualDuration, easing },
         ),
@@ -333,6 +300,50 @@ export function createTransitionCoordinator<
         clearLayerMechanics(outgoing);
         transitioningRegionLayers.delete(incoming);
         transitioningRegionLayers.delete(outgoing);
+      });
+
+      const surface = registry.regionTransitionSurfaces.get(region)?.element;
+      if (!surface || reduceMotion) continue;
+      const surfaceCurrent = currentSurfaceVisuals.get(surface);
+      const surfaceOpacity = surfaceCurrent?.continuing
+        ? surfaceCurrent.opacity || "0"
+        : "0";
+      const surfaceBackdropFilter = surfaceCurrent?.continuing
+        ? surfaceCurrent.backdropFilter || "blur(0px)"
+        : "blur(0px)";
+      transitioningRegionSurfaces.add(surface);
+      surface.style.opacity = surfaceOpacity;
+      surface.style.setProperty("backdrop-filter", surfaceBackdropFilter);
+      surface.style.setProperty("-webkit-backdrop-filter", surfaceBackdropFilter);
+      controls.push(
+        options.animation.animate(
+          surface,
+          [
+            {
+              offset: 0,
+              opacity: Number(surfaceOpacity),
+              backdropFilter: surfaceBackdropFilter,
+              webkitBackdropFilter: surfaceBackdropFilter,
+            },
+            {
+              offset: 0.5,
+              opacity: 1,
+              backdropFilter: "blur(2px)",
+              webkitBackdropFilter: "blur(2px)",
+            },
+            {
+              offset: 1,
+              opacity: 0,
+              backdropFilter: "blur(0px)",
+              webkitBackdropFilter: "blur(0px)",
+            },
+          ],
+          { durationMs: actualDuration, easing },
+        ),
+      );
+      cleanups.push(() => {
+        clearTransitionSurfaceMechanics(surface);
+        transitioningRegionSurfaces.delete(surface);
       });
     }
   };
@@ -442,11 +453,20 @@ export function createTransitionCoordinator<
         const style = environment.getComputedStyle(layer.element);
         currentLayerVisuals.set(layer.element, {
           opacity: style.opacity,
-          filter: style.filter,
-          transform: style.transform,
           continuing: transitioningRegionLayers.has(layer.element),
         });
       }
+    }
+    const currentSurfaceVisuals = new Map<HTMLElement, TransitionSurfaceVisual>();
+    for (const surface of registry.regionTransitionSurfaces.values()) {
+      const style = environment.getComputedStyle(surface.element);
+      currentSurfaceVisuals.set(surface.element, {
+        opacity: style.opacity,
+        backdropFilter:
+          style.getPropertyValue("backdrop-filter") ||
+          style.getPropertyValue("-webkit-backdrop-filter"),
+        continuing: transitioningRegionSurfaces.has(surface.element),
+      });
     }
     const openingFromClosed =
       authoritative.open && snapshot.settledTarget === null && active === null;
@@ -666,6 +686,7 @@ export function createTransitionCoordinator<
             controls,
             cleanups,
             currentLayerVisuals,
+            currentSurfaceVisuals,
           );
           startAttempt();
         });
@@ -703,6 +724,7 @@ export function createTransitionCoordinator<
           controls,
           cleanups,
           currentLayerVisuals,
+          currentSurfaceVisuals,
         );
       }
 
